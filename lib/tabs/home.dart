@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n.dart';
 import '../local_data.dart';
+import '../location.dart';
 import '../models.dart';
 import '../services.dart';
 import '../widgets/mascot.dart';
@@ -22,6 +23,7 @@ class _HomeTabState extends State<HomeTab> {
   late Future<WeatherSnapshot?> _wx;
   late Future<AirQuality?> _aqi;
   late Future<List<WeatherAlert>> _alerts;
+  final bool _nearest = true;
 
   @override
   void initState() {
@@ -31,9 +33,20 @@ class _HomeTabState extends State<HomeTab> {
 
   void _load() {
     _readings = _border.currentReadings();
-    _wx = _weather.current();
-    _aqi = _weather.airQuality();
+    _wx = _weatherWithLocation();
+    _aqi = _aqiWithLocation();
     _alerts = _weather.alerts();
+  }
+
+  Future<WeatherSnapshot?> _weatherWithLocation() async {
+    final p = await locationService.ensure();
+    if (p != null && mounted) setState(() {});
+    return _weather.current(atLat: p?.latitude, atLon: p?.longitude);
+  }
+
+  Future<AirQuality?> _aqiWithLocation() async {
+    final p = await locationService.ensure();
+    return _weather.airQuality(atLat: p?.latitude, atLon: p?.longitude);
   }
 
   Future<void> _refresh() async {
@@ -65,6 +78,7 @@ class _HomeTabState extends State<HomeTab> {
         padding: const EdgeInsets.only(bottom: 28),
         children: [
           _hero(s, theme),
+          _locationBanner(s, theme),
           _liveBanner(s, theme),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
@@ -144,6 +158,62 @@ class _HomeTabState extends State<HomeTab> {
         ],
       ),
     );
+  }
+  Widget _locationBanner(S s, ThemeData theme) {
+    final hasFix = locationService.hasFix;
+    final denied = locationService.status == LocStatus.denied ||
+        locationService.status == LocStatus.deniedForever ||
+        locationService.status == LocStatus.unsupported;
+    if (hasFix) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      child: Material(
+        color: theme.colorScheme.secondary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: denied ? null : _enableLocation,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Icon(denied ? Icons.location_disabled : Icons.my_location,
+                    color: theme.colorScheme.secondary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                          denied
+                              ? s.t('location_blocked')
+                              : s.t('location_prompt'),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w700, fontSize: 13.5)),
+                      Text(
+                          denied
+                              ? s.t('location_blocked_hint')
+                              : s.t('location_hint'),
+                          style: const TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                ),
+                if (!denied)
+                  Icon(Icons.chevron_right,
+                      color: theme.colorScheme.secondary),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _enableLocation() async {
+    await locationService.ensure();
+    if (mounted) setState(_load);
   }
 
   Widget _liveBanner(S s, ThemeData theme) {
@@ -487,12 +557,39 @@ class _HomeTabState extends State<HomeTab> {
                                       strokeWidth: 2.5))),
                         );
                       }
-                      final sorted = [...data]
-                        ..sort((a, b) => a.waitMinutes.compareTo(b.waitMinutes));
+                      final haveFix = locationService.hasFix;
+                      final sorted = [...data]..sort((a, b) => _nearest && haveFix
+                          ? locationService
+                              .distanceTo(a.bridge.lat, a.bridge.lon)
+                              .compareTo(locationService.distanceTo(
+                                  b.bridge.lat, b.bridge.lon))
+                          : a.waitMinutes.compareTo(b.waitMinutes));
                       final top = sorted.take(3).toList();
                       return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          for (final r in top) _glanceBridgeRow(context, s, r),
+                          if (haveFix)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.near_me,
+                                      size: 14, color: Color(0xFF0E7490)),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _nearest
+                                        ? s.t('nearest_to_you')
+                                        : s.t('fastest_now'),
+                                    style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: theme.colorScheme.secondary),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          for (final r in top)
+                            _glanceBridgeRow(context, s, r, haveFix),
                         ],
                       );
                     },
@@ -543,31 +640,57 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  Widget _glanceBridgeRow(BuildContext context, S s, BridgeReading r) {
+  Widget _glanceBridgeRow(
+      BuildContext context, S s, BridgeReading r, bool haveFix) {
     final color = switch (r.state) {
       BridgeState.moving => const Color(0xFF2E7D32),
       BridgeState.slow => const Color(0xFFF9A825),
       BridgeState.heavy => const Color(0xFFC62828),
     };
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Container(
-            width: 9,
-            height: 9,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(s.es ? r.bridge.nameEs : r.bridge.name,
-                style: const TextStyle(
-                    fontSize: 13.5, fontWeight: FontWeight.w600)),
-          ),
-          Text('${r.waitMinutes} ${s.t('min')}',
-              style: TextStyle(
-                  color: color, fontWeight: FontWeight.w800, fontSize: 13.5)),
-        ],
+    final mi = haveFix
+        ? locationService.distanceTo(r.bridge.lat, r.bridge.lon)
+        : null;
+    return InkWell(
+      onTap: () => LocationService.directions(
+        lat: r.bridge.lat,
+        lon: r.bridge.lon,
+        label: r.bridge.name,
+        origin: locationService.position,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Container(
+              width: 9,
+              height: 9,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(s.es ? r.bridge.nameEs : r.bridge.name,
+                      style: const TextStyle(
+                          fontSize: 13.5, fontWeight: FontWeight.w600)),
+                  if (mi != null)
+                    Text('${mi.toStringAsFixed(1)} ${s.t('mi_away')}',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant)),
+                ],
+              ),
+            ),
+            Text('${r.waitMinutes} ${s.t('min')}',
+                style: TextStyle(
+                    color: color, fontWeight: FontWeight.w800, fontSize: 13.5)),
+            const SizedBox(width: 4),
+            const Icon(Icons.directions, size: 15, color: Color(0xFF0E7490)),
+          ],
+        ),
       ),
     );
   }

@@ -510,5 +510,23 @@ class S {
       'es': 'No se pudo conectar a la fuente en vivo. Mostrando la mejor información disponible.',
     },
     'my_location': {'en': 'My area', 'es': 'Mi zona'},
+    'location_prompt': {'en': 'Use your location', 'es': 'Use su ubicación'},
+    'location_hint': {
+      'en': 'See distances and get directions from where you are.',
+      'es': 'Vea distancias y obtenga indicaciones desde donde está.',
+    },
+    'location_blocked': {'en': 'Location is off', 'es': 'Ubicación desactivada'},
+    'location_blocked_hint': {
+      'en': 'Enable location in your browser/device settings to get distances and directions.',
+      'es': 'Active la ubicación en su navegador o dispositivo para ver distancias e indicaciones.',
+    },
+    'nearest_to_you': {'en': 'Nearest to you', 'es': 'Más cercanos a usted'},
+    'fastest_now': {'en': 'Fastest right now', 'es': 'Más rápidos ahora'},
+    'mi_away': {'en': 'mi away', 'es': 'mi de distancia'},
+    'open_maps': {'en': 'Open in Maps', 'es': 'Abrir en Mapas'},
+    'lanes_closed': {'en': 'Lanes closed', 'es': 'Carriles cerrados'},
+    'est_wait': {'en': 'estimated', 'es': 'estimado'},
+    'port_status': {'en': 'Port status', 'es': 'Estado del puerto'},
+    'nearest_bridge': {'en': 'Nearest bridge', 'es': 'Puente más cercano'},
   };
 }

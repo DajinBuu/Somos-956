@@ -3,6 +3,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../l10n.dart';
 import '../local_data.dart';
+import '../location.dart';
 import '../models.dart';
 import '../widgets/mascot.dart';
 import 'common.dart';
@@ -39,6 +40,21 @@ class _CommunityTabState extends State<CommunityTab> {
   List<CommunityResource> get _visible => _filter == null
       ? kCommunityResources
       : kCommunityResources.where((r) => r.type == _filter).toList();
+
+  List<CommunityResource> get _sorted {
+    final list = [..._visible];
+    if (locationService.hasFix) {
+      list.sort((a, b) => locationService
+          .distanceTo(a.lat, a.lon)
+          .compareTo(locationService.distanceTo(b.lat, b.lon)));
+    }
+    return list;
+  }
+
+  Future<void> _enableLocation() async {
+    await locationService.ensure();
+    if (mounted) setState(() {});
+  }
 
   _ResStyle _styleFor(ResourceType t) => switch (t) {
         ResourceType.food => const _ResStyle('res_food', Icons.restaurant, Color(0xFF2E7D32)),
@@ -103,12 +119,19 @@ class _CommunityTabState extends State<CommunityTab> {
                       selected: _filter == t,
                       onSelected: (_) => setState(() => _filter = t),
                     ),
+                  if (!locationService.hasFix)
+                    ActionChip(
+                      avatar: const Icon(Icons.my_location, size: 16),
+                      label: Text(s.t('location_prompt'),
+                          style: const TextStyle(fontSize: 12)),
+                      onPressed: _enableLocation,
+                    ),
                 ],
               ),
               const SizedBox(height: 10),
               MapPane(
                 markers: [
-                  for (final r in _visible)
+                  for (final r in _sorted)
                     MapMarker(
                       point: LatLng(r.lat, r.lon),
                       color: _styleFor(r.type).color,
@@ -116,12 +139,15 @@ class _CommunityTabState extends State<CommunityTab> {
                       label: r.name,
                     ),
                 ],
-                center: const LatLng(26.18, -98.0),
+                center: locationService.hasFix
+                    ? LatLng(locationService.reference.$1,
+                        locationService.reference.$2)
+                    : const LatLng(26.18, -98.0),
                 zoom: 8.9,
                 height: 300,
               ),
               const SizedBox(height: 8),
-              for (final r in _visible)
+              for (final r in _sorted)
                 Card(
                   elevation: 0,
                   color: Theme.of(context).colorScheme.surfaceContainerLow,
@@ -138,15 +164,21 @@ class _CommunityTabState extends State<CommunityTab> {
                     title: Text(r.name,
                         style: const TextStyle(fontWeight: FontWeight.w600)),
                     subtitle: Text(
-                        '${s.t(_styleFor(r.type).labelKey)} · ${r.city}\n${s.pick(r.hoursEn, r.hoursEs)}'),
+                        '${s.t(_styleFor(r.type).labelKey)} · ${r.city}'
+                        '${locationService.hasFix ? ' · ${locationService.distanceTo(r.lat, r.lon).toStringAsFixed(1)} ${s.t('mi_away')}' : ''}'
+                        '\n${s.pick(r.hoursEn, r.hoursEs)}'),
                     isThreeLine: true,
                     trailing: (!r.phone.startsWith('(') && r.phone != 'Various' && r.phone != '(contact city)')
-                        ? Chip(
-                            label: Text(r.phone,
-                                style: const TextStyle(fontSize: 11)),
-                            visualDensity: VisualDensity.compact,
-                            backgroundColor:
-                                _styleFor(r.type).color.withValues(alpha: 0.1),
+                        ? IconButton(
+                            tooltip: s.t('directions'),
+                            icon: const Icon(Icons.directions,
+                                color: Color(0xFF0E7490)),
+                            onPressed: () => LocationService.directions(
+                              lat: r.lat,
+                              lon: r.lon,
+                              label: r.name,
+                              origin: locationService.position,
+                            ),
                           )
                         : null,
                     onTap: () => showModalBottomSheet<void>(
@@ -181,9 +213,34 @@ class _CommunityTabState extends State<CommunityTab> {
                             const SizedBox(height: 8),
                             Text(s.pick(r.detailEn, r.detailEs)),
                             const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: FilledButton.icon(
+                                    icon: const Icon(Icons.directions, size: 18),
+                                    label: Text(s.t('directions')),
+                                    onPressed: () => LocationService.directions(
+                                      lat: r.lat,
+                                      lon: r.lon,
+                                      label: r.name,
+                                      origin: locationService.position,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    icon: const Icon(Icons.call, size: 18),
+                                    label: Text(s.t('call')),
+                                    onPressed: () => LocationService.call(r.phone),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
                             SizedBox(
                               width: double.infinity,
-                              child: FilledButton(
+                              child: OutlinedButton(
                                 onPressed: () => Navigator.pop(ctx),
                                 child: Text(s.t('close')),
                               ),

@@ -3,6 +3,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../l10n.dart';
 import '../local_data.dart';
+import '../location.dart';
 import '../models.dart';
 import '../notifications.dart';
 import '../services.dart';
@@ -33,6 +34,21 @@ class _HealthTabState extends State<HealthTab> {
 
   List<CareFacility> get _visible =>
       _filter == null ? _nearby : _nearby.where((c) => c.type == _filter).toList();
+
+  List<CareFacility> get _sorted {
+    final list = [..._visible];
+    if (locationService.hasFix) {
+      list.sort((a, b) => locationService
+          .distanceTo(a.lat, a.lon)
+          .compareTo(locationService.distanceTo(b.lat, b.lon)));
+    }
+    return list;
+  }
+
+  Future<void> _enableLocation() async {
+    await locationService.ensure();
+    if (mounted) setState(() {});
+  }
 
   _CareStyle _styleFor(CareType t) {
     switch (t) {
@@ -88,9 +104,34 @@ class _HealthTabState extends State<HealthTab> {
             const SizedBox(height: 8),
             Text(s.pick(f.servicesEn, f.servicesEs)),
             const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    icon: const Icon(Icons.directions, size: 18),
+                    label: Text(s.t('directions')),
+                    onPressed: () => LocationService.directions(
+                      lat: f.lat,
+                      lon: f.lon,
+                      label: f.name,
+                      origin: locationService.position,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.call, size: 18),
+                    label: Text(s.t('call')),
+                    onPressed: () => LocationService.call(f.phone),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
-              child: FilledButton(
+              child: OutlinedButton(
                 onPressed: () => Navigator.pop(ctx),
                 child: Text(s.t('close')),
               ),
@@ -262,12 +303,19 @@ class _HealthTabState extends State<HealthTab> {
                   _chip(s.t('filter_all'), null),
                   for (final t in CareType.values)
                     _chip(s.t(_styleFor(t).labelKey), t),
+                  if (!locationService.hasFix)
+                    ActionChip(
+                      avatar: const Icon(Icons.my_location, size: 16),
+                      label: Text(s.t('location_prompt'),
+                          style: const TextStyle(fontSize: 12)),
+                      onPressed: _enableLocation,
+                    ),
                 ],
               ),
               const SizedBox(height: 10),
               MapPane(
                 markers: [
-                  for (final f in _visible)
+                  for (final f in _sorted)
                     MapMarker(
                       point: LatLng(f.lat, f.lon),
                       color: _styleFor(f.type).color,
@@ -276,12 +324,15 @@ class _HealthTabState extends State<HealthTab> {
                       onTap: () => _showFacility(f),
                     ),
                 ],
-                center: const LatLng(26.15, -98.0),
+                center: locationService.hasFix
+                    ? LatLng(locationService.reference.$1,
+                        locationService.reference.$2)
+                    : const LatLng(26.15, -98.0),
                 zoom: 9.0,
                 height: 340,
               ),
               const SizedBox(height: 8),
-              for (final f in _visible)
+              for (final f in _sorted)
                 Card(
                   elevation: 0,
                   color: Theme.of(context).colorScheme.surfaceContainerLow,
@@ -301,9 +352,19 @@ class _HealthTabState extends State<HealthTab> {
                     subtitle: Text(
                       '${s.t(_styleFor(f.type).labelKey)} · ${f.city}'
                       '${f.open24h ? ' · 24/7' : ''}'
-                      '${f.acceptsUninsured ? ' · ${s.t('free_lowcost')}' : ''}',
+                      '${f.acceptsUninsured ? ' · ${s.t('free_lowcost')}' : ''}'
+                      '${locationService.hasFix ? ' · ${locationService.distanceTo(f.lat, f.lon).toStringAsFixed(1)} ${s.t('mi_away')}' : ''}',
                     ),
-                    trailing: const Icon(Icons.chevron_right),
+                    trailing: IconButton(
+                      tooltip: s.t('directions'),
+                      icon: const Icon(Icons.directions, color: Color(0xFF0E7490)),
+                      onPressed: () => LocationService.directions(
+                        lat: f.lat,
+                        lon: f.lon,
+                        label: f.name,
+                        origin: locationService.position,
+                      ),
+                    ),
                     onTap: () => _showFacility(f),
                   ),
                 ),

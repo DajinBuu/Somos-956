@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:somos_956/l10n.dart';
 import 'package:somos_956/local_data.dart';
+import 'package:somos_956/location.dart';
 import 'package:somos_956/main.dart';
 import 'package:somos_956/models.dart';
 import 'package:somos_956/services.dart';
@@ -44,11 +45,34 @@ void main() {
   test('bridge wait model returns a bounded value', () {
     final bridge = kBridges.first;
     final wait = BorderService.predictWait(bridge, DateTime(2026, 5, 1, 8));
-    expect(wait, inInclusiveRange(3, 90));
+    expect(wait, inInclusiveRange(2, 120));
     expect(BorderService.stateFor(wait), isA<BridgeState>());
 
     final forecast = BorderService.forecast(bridge, DateTime(2026, 5, 1, 8));
     expect(forecast, isNotEmpty);
+  });
+
+  test('rush-hour estimate exceeds the overnight estimate', () {
+    final bridge = kBridges.first;
+    final rush = BorderService.predictWait(bridge, DateTime(2026, 5, 1, 17));
+    final night = BorderService.predictWait(bridge, DateTime(2026, 5, 1, 3));
+    expect(rush, greaterThan(night));
+  });
+
+  test('distance math is accurate', () {
+    // McAllen to Brownsville is ~54 miles straight-line.
+    final d = LocationService.miles(26.2034, -98.2300, 25.9018, -97.4975);
+    expect(d, inInclusiveRange(45, 65));
+    // Same point is zero.
+    expect(LocationService.miles(26.2, -98.2, 26.2, -98.2), closeTo(0, 0.001));
+  });
+
+  test('more crossings and locations are present', () {
+    expect(kBridges.length, greaterThanOrEqualTo(12));
+    expect(kCareFacilities.length, greaterThanOrEqualTo(20));
+    expect(
+        kCareFacilities.any((c) => c.city == 'Rio Grande City'), isTrue);
+    expect(kBridges.any((b) => b.city == 'Roma'), isTrue);
   });
 
   test('weather code mapping is friendly text', () {

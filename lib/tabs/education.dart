@@ -3,6 +3,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../l10n.dart';
 import '../local_data.dart';
+import '../location.dart';
 import '../models.dart';
 import '../widgets/mascot.dart';
 import 'common.dart';
@@ -20,6 +21,23 @@ class _EducationTabState extends State<EducationTab> {
   List<EduResource> get _visible => _filter == null
       ? kEduResources
       : kEduResources.where((r) => r.type == _filter).toList();
+
+  List<EduResource> get _sorted {
+    final list = [..._visible];
+    if (locationService.hasFix) {
+      list.sort((a, b) {
+        final da = a.lat == 0 ? double.infinity : locationService.distanceTo(a.lat, a.lon);
+        final db = b.lat == 0 ? double.infinity : locationService.distanceTo(b.lat, b.lon);
+        return da.compareTo(db);
+      });
+    }
+    return list;
+  }
+
+  Future<void> _enableLocation() async {
+    await locationService.ensure();
+    if (mounted) setState(() {});
+  }
 
   _EduStyle _styleFor(EduType t) => switch (t) {
         EduType.tutoring => const _EduStyle('edu_k12', Icons.menu_book, Color(0xFFC2410C)),
@@ -63,12 +81,19 @@ class _EducationTabState extends State<EducationTab> {
                       selected: _filter == t,
                       onSelected: (_) => setState(() => _filter = t),
                     ),
+                  if (!locationService.hasFix)
+                    ActionChip(
+                      avatar: const Icon(Icons.my_location, size: 16),
+                      label: Text(s.t('location_prompt'),
+                          style: const TextStyle(fontSize: 12)),
+                      onPressed: _enableLocation,
+                    ),
                 ],
               ),
               const SizedBox(height: 10),
               MapPane(
                 markers: [
-                  for (final r in _visible)
+                  for (final r in _sorted)
                     if (r.lat != 0)
                       MapMarker(
                         point: LatLng(r.lat, r.lon),
@@ -77,12 +102,15 @@ class _EducationTabState extends State<EducationTab> {
                         label: r.name,
                       ),
                 ],
-                center: const LatLng(26.20, -98.0),
+                center: locationService.hasFix
+                    ? LatLng(locationService.reference.$1,
+                        locationService.reference.$2)
+                    : const LatLng(26.20, -98.0),
                 zoom: 8.9,
                 height: 300,
               ),
               const SizedBox(height: 8),
-              for (final r in _visible)
+              for (final r in _sorted)
                 _eduCard(context, s, settings, r, es),
             ],
           ),
@@ -117,11 +145,23 @@ class _EducationTabState extends State<EducationTab> {
                     children: [
                       Text(r.name,
                           style: const TextStyle(fontWeight: FontWeight.w700)),
-                      Text('${r.provider}${r.city.isNotEmpty ? ' · ${r.city}' : ''}',
+                      Text('${r.provider}${r.city.isNotEmpty ? ' · ${r.city}' : ''}'
+                          '${locationService.hasFix && r.lat != 0 ? ' · ${locationService.distanceTo(r.lat, r.lon).toStringAsFixed(1)} ${s.t('mi_away')}' : ''}',
                           style: Theme.of(context).textTheme.bodySmall),
                     ],
                   ),
                 ),
+                if (r.lat != 0)
+                  IconButton(
+                    tooltip: s.t('directions'),
+                    icon: const Icon(Icons.directions, color: Color(0xFF0E7490)),
+                    onPressed: () => LocationService.directions(
+                      lat: r.lat,
+                      lon: r.lon,
+                      label: r.name,
+                      origin: locationService.position,
+                    ),
+                  ),
                 IconButton(
                   icon: Icon(saved ? Icons.bookmark : Icons.bookmark_border,
                       color: saved ? style.color : null),
@@ -159,10 +199,24 @@ class _EducationTabState extends State<EducationTab> {
                   label: s.t('edu_amount'),
                   value: es ? r.rewardEs : r.rewardEn),
             if (r.phone.isNotEmpty)
-              InfoTile(
-                  icon: Icons.phone_outlined,
-                  label: s.t('call'),
-                  value: r.phone),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  children: [
+                    Icon(Icons.phone_outlined,
+                        size: 17,
+                        color: Theme.of(context).colorScheme.secondary),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(r.phone)),
+                    TextButton.icon(
+                      onPressed: () => LocationService.call(r.phone),
+                      icon: const Icon(Icons.call, size: 16),
+                      label: Text(s.t('call'),
+                          style: const TextStyle(fontSize: 12)),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),

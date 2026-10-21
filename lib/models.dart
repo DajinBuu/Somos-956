@@ -77,7 +77,7 @@ class Bridge {
   final String cityEs;
   final String crossing;
   final String portNumber; // CBP port_number used by the live BWT feed
-  final List<int> hourlyPattern; // 24 values, relative delay 0..10 (fallback)
+  final List<int> hourlyPattern; // 24 values, typical wait minutes by hour
   final double lat;
   final double lon;
   const Bridge({
@@ -104,6 +104,7 @@ class BridgeReading {
   final int? commercialWait;
   final int? pedestrianWait;
   final String laneStatus;
+  final bool lanesClosed;
   const BridgeReading({
     required this.bridge,
     required this.waitMinutes,
@@ -114,6 +115,7 @@ class BridgeReading {
     this.commercialWait,
     this.pedestrianWait,
     this.laneStatus = '',
+    this.lanesClosed = false,
   });
 }
 

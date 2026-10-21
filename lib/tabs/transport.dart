@@ -3,6 +3,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../l10n.dart';
 import '../local_data.dart';
+import '../location.dart';
 import '../models.dart';
 import '../services.dart';
 import '../widgets/mascot.dart';
@@ -23,6 +24,7 @@ class _TransportTabState extends State<TransportTab> {
   late Future<List<RoadEvent>> _closures;
   DateTime _updated = DateTime.now();
   bool _commercial = false;
+  bool _nearestFirst = true;
 
   Bridge? _etaBridge;
   int _etaHour = DateTime.now().hour;
@@ -36,9 +38,17 @@ class _TransportTabState extends State<TransportTab> {
   void _refresh() {
     setState(() {
       _readings = _border.currentReadings(commercial: _commercial);
-      _closures = _roads.closures();
+      _closures = _roads.closures(
+        nearLat: locationService.hasFix ? locationService.reference.$1 : null,
+        nearLon: locationService.hasFix ? locationService.reference.$2 : null,
+      );
       _updated = DateTime.now();
     });
+  }
+
+  Future<void> _enableLocation() async {
+    await locationService.ensure();
+    if (mounted) _refresh();
   }
 
   Color _bridgeColor(BridgeState s) => switch (s) {
@@ -135,27 +145,66 @@ class _TransportTabState extends State<TransportTab> {
                         ),
                       );
                     }
+                    final haveFix = locationService.hasFix;
+                    final list = [...data];
+                    if (haveFix && _nearestFirst) {
+                      list.sort((a, b) => locationService
+                          .distanceTo(a.bridge.lat, a.bridge.lon)
+                          .compareTo(locationService.distanceTo(
+                              b.bridge.lat, b.bridge.lon)));
+                    }
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Row(
+                          children: [
+                            if (!haveFix)
+                              ActionChip(
+                                avatar: const Icon(Icons.my_location, size: 16),
+                                label: Text(s.t('location_prompt'),
+                                    style: const TextStyle(fontSize: 12)),
+                                onPressed: _enableLocation,
+                              )
+                            else
+                              ChoiceChip(
+                                avatar: Icon(
+                                    _nearestFirst
+                                        ? Icons.near_me
+                                        : Icons.speed,
+                                    size: 16),
+                                label: Text(
+                                    _nearestFirst
+                                        ? s.t('nearest_to_you')
+                                        : s.t('fastest_now'),
+                                    style: const TextStyle(fontSize: 12)),
+                                selected: _nearestFirst,
+                                onSelected: (v) =>
+                                    setState(() => _nearestFirst = v),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
                         MapPane(
                           markers: [
-                            for (final r in data)
+                            for (final r in list)
                               MapMarker(
-                                point: LatLng(
-                                    r.bridge.lat, r.bridge.lon),
+                                point: LatLng(r.bridge.lat, r.bridge.lon),
                                 color: _bridgeColor(r.state),
                                 icon: Icons.directions_car,
                                 label:
                                     '${r.bridge.name}: ${r.waitMinutes} ${s.t('min')}',
                               ),
                           ],
-                          center: const LatLng(26.05, -98.0),
+                          center: haveFix
+                              ? LatLng(locationService.reference.$1,
+                                  locationService.reference.$2)
+                              : const LatLng(26.05, -98.0),
                           zoom: 8.6,
                           height: 280,
                         ),
                         const SizedBox(height: 10),
-                        for (final r in data) _bridgeCard(context, s, r, es),
+                        for (final r in list)
+                          _bridgeCard(context, s, r, es, haveFix),
                         const SizedBox(height: 4),
                         Row(
                           children: [
@@ -319,9 +368,13 @@ class _TransportTabState extends State<TransportTab> {
     return out;
   }
 
-  Widget _bridgeCard(BuildContext context, S s, BridgeReading r, bool es) {
+  Widget _bridgeCard(
+      BuildContext context, S s, BridgeReading r, bool es, bool haveFix) {
     final color = _bridgeColor(r.state);
     final best = BorderService.bestWindow(r.bridge, DateTime.now());
+    final mi = haveFix
+        ? locationService.distanceTo(r.bridge.lat, r.bridge.lon)
+        : null;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Container(
@@ -349,7 +402,8 @@ class _TransportTabState extends State<TransportTab> {
                           style: const TextStyle(fontWeight: FontWeight.w700)),
                       const SizedBox(height: 2),
                       Text(
-                          '${es ? r.bridge.cityEs : r.bridge.city} · ${r.bridge.crossing}',
+                          '${es ? r.bridge.cityEs : r.bridge.city} · ${r.bridge.crossing}'
+                          '${mi != null ? ' · ${mi.toStringAsFixed(1)} ${s.t('mi_away')}' : ''}',
                           style: Theme.of(context).textTheme.bodySmall),
                       Row(
                         children: [
@@ -363,6 +417,12 @@ class _TransportTabState extends State<TransportTab> {
                           else
                             const Icon(Icons.schedule,
                                 size: 12, color: Colors.blueGrey),
+                          if (!r.live) ...[
+                            const SizedBox(width: 3),
+                            Text(s.t('est_wait'),
+                                style: const TextStyle(
+                                    fontSize: 10.5, color: Colors.blueGrey)),
+                          ],
                         ],
                       ),
                     ],
@@ -371,13 +431,26 @@ class _TransportTabState extends State<TransportTab> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('${r.waitMinutes}',
-                        style: TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800,
-                            color: color)),
+                    if (r.lanesClosed && !r.live)
+                      Text(s.t('lanes_closed'),
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: color))
+                    else
+                      Text('${r.waitMinutes}',
+                          style: TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                              color: color)),
                     Text(s.t('bridge_wait').toLowerCase(),
                         style: Theme.of(context).textTheme.labelSmall),
+                    Text('as of ${fmtTime(r.updated)}',
+                        style: TextStyle(
+                            fontSize: 9.5,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant)),
                   ],
                 ),
               ],
@@ -405,10 +478,30 @@ class _TransportTabState extends State<TransportTab> {
             ],
             Row(
               children: [
-                const Icon(Icons.schedule, size: 14, color: Colors.black54),
-                const SizedBox(width: 4),
-                Text('${s.t('best_time')}: ${_hourLabel(best.hour)} (${best.wait} ${s.t('min')})',
-                    style: Theme.of(context).textTheme.bodySmall),
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Icon(Icons.schedule, size: 14, color: Colors.black54),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                            '${s.t('best_time')}: ${_hourLabel(best.hour)} (${best.wait} ${s.t('min')})',
+                            style: Theme.of(context).textTheme.bodySmall),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () => LocationService.directions(
+                    lat: r.bridge.lat,
+                    lon: r.bridge.lon,
+                    label: r.bridge.name,
+                    origin: locationService.position,
+                  ),
+                  icon: const Icon(Icons.directions, size: 16),
+                  label: Text(s.t('directions'),
+                      style: const TextStyle(fontSize: 12)),
+                ),
               ],
             ),
           ],
@@ -550,6 +643,18 @@ class _TransportTabState extends State<TransportTab> {
           Text(_roadLabel(s, e.severity),
               style: TextStyle(
                   color: color, fontWeight: FontWeight.w700, fontSize: 12)),
+          if (e.lat != 0 || e.lon != 0)
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              tooltip: s.t('directions'),
+              icon: const Icon(Icons.directions, size: 18, color: Color(0xFF0E7490)),
+              onPressed: () => LocationService.directions(
+                lat: e.lat,
+                lon: e.lon,
+                label: e.route,
+                origin: locationService.position,
+              ),
+            ),
         ],
       ),
     );

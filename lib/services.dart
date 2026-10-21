@@ -76,24 +76,32 @@ class BorderService {
           live: false,
         );
       }
-      final pax = _laneDelay(row, 'passenger_vehicle_lanes', commercial: false);
-      final veh =
-          _laneDelay(row, 'commercial_vehicle_lanes', commercial: true);
-      final ped = _laneDelay(row, 'pedestrian_lanes', commercial: false);
-      final chosen = commercial
-          ? (veh ?? pax)
-          : (pax ?? veh);
+
+      final asOf = _asOf(row) ?? now;
+      final laneKey = commercial
+          ? 'commercial_vehicle_lanes'
+          : 'passenger_vehicle_lanes';
+
+      // Prefer the fastest open lane group (Ready / NEXUS / FAST) since that is
+      // the wait a traveler can actually opt into; fall back to standard.
+      final pax = _bestLaneDelay(row, 'passenger_vehicle_lanes');
+      final veh = _bestLaneDelay(row, 'commercial_vehicle_lanes');
+      final ped = _bestLaneDelay(row, 'pedestrian_lanes');
+      final chosen = commercial ? (veh ?? pax) : (pax ?? veh);
+      final closed = _isClosed(row, laneKey);
+
       final wait = chosen ?? predictWait(b, now);
       return BridgeReading(
         bridge: b,
         waitMinutes: wait,
         state: stateFor(wait),
-        updated: now,
+        updated: asOf,
         live: chosen != null,
         passengerWait: pax,
         commercialWait: veh,
         pedestrianWait: ped,
-        laneStatus: _laneStatus(row, commercial),
+        laneStatus: _laneStatus(row, laneKey),
+        lanesClosed: closed && chosen == null,
       );
     }).toList();
   }
@@ -106,21 +114,58 @@ class BorderService {
     return null;
   }
 
-  int? _laneDelay(Map<String, dynamic> row, String laneKey,
-      {required bool commercial}) {
-    final lanes = row[laneKey];
-    if (lanes is! Map) return null;
-    final standard = lanes['standard_lanes'];
-    if (standard is Map) {
-      final v = _parseInt(standard['delay_minutes']);
-      if (v != null) return v.clamp(0, 240);
+  /// Real "as-of" time reported by CBP (top-level `date` + `time`).
+  DateTime? _asOf(Map<String, dynamic> row) {
+    final d = '${row['date'] ?? ''}'.trim();
+    final t = '${row['time'] ?? ''}'.trim();
+    if (d.isEmpty) return null;
+    try {
+      final parts = d.split('/');
+      if (parts.length != 3) return null;
+      final tp = t.split(':');
+      return DateTime(
+        int.parse(parts[2]),
+        int.parse(parts[0]),
+        int.parse(parts[1]),
+        tp.isNotEmpty ? int.tryParse(tp[0]) ?? 0 : 0,
+        tp.length > 1 ? int.tryParse(tp[1]) ?? 0 : 0,
+      );
+    } catch (_) {
+      return null;
     }
-    return null;
   }
 
-  String _laneStatus(Map<String, dynamic> row, bool commercial) {
-    final laneKey =
-        commercial ? 'commercial_vehicle_lanes' : 'passenger_vehicle_lanes';
+  /// The minimum non-null delay across standard/ready/NEXUS/FAST lane groups
+  /// for the given lane category. Returns null when the feed has no number.
+  int? _bestLaneDelay(Map<String, dynamic> row, String laneKey) {
+    final lanes = row[laneKey];
+    if (lanes is! Map) return null;
+    int? best;
+    for (final group in lanes.values) {
+      if (group is! Map) continue;
+      final v = _parseInt(group['delay_minutes']);
+      if (v == null) continue;
+      if (best == null || v < best) best = v;
+    }
+    return best?.clamp(0, 300);
+  }
+
+  bool _isClosed(Map<String, dynamic> row, String laneKey) {
+    final status = '${row['port_status'] ?? ''}'.toLowerCase();
+    if (status.contains('closed')) return true;
+    final lanes = row[laneKey];
+    if (lanes is Map) {
+      for (final group in lanes.values) {
+        if (group is Map) {
+          final os = '${group['operational_status'] ?? ''}'.toLowerCase();
+          if (os.contains('closed')) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  String _laneStatus(Map<String, dynamic> row, String laneKey) {
     final lanes = row[laneKey];
     if (lanes is Map) {
       final standard = lanes['standard_lanes'];
@@ -132,14 +177,14 @@ class BorderService {
     return '';
   }
 
-  /// Offline fallback: historical time-of-day model (clearly labeled as an
-  /// estimate, never presented as live).
+  /// Offline fallback: realistic time-of-day model. [Bridge.hourlyPattern] holds
+  /// typical *minutes* of wait per hour of day (northbound into the U.S.).
+  /// Falls back clearly labeled as an estimate, never presented as live.
   static int predictWait(Bridge b, DateTime t) {
-    final pattern = b.hourlyPattern[t.hour];
-    final baseline = 350 + pattern * 3 * 12;
-    final jitter = ((t.day + t.hour) % 3 - 1) * 3;
-    final seconds = baseline + jitter * 6;
-    return (seconds / 60).round().clamp(3, 90);
+    final base = b.hourlyPattern[t.hour];
+    // Small deterministic variation by day so consecutive days aren't identical.
+    final wobble = ((t.day * 7 + t.hour * 3) % 7) - 3;
+    return (base + wobble).clamp(2, 120);
   }
 
   static List<BridgeForecast> forecast(Bridge b, DateTime from,
@@ -152,7 +197,7 @@ class BorderService {
     return out;
   }
 
-  static BridgeForecast bestWindow(Bridge b, DateTime from, {int hours = 10}) {
+  static BridgeForecast bestWindow(Bridge b, DateTime from, {int hours = 24}) {
     final f = forecast(b, from, hours: hours);
     return f.reduce((a, c) => c.wait < a.wait ? c : a);
   }
@@ -172,17 +217,19 @@ class WeatherService {
   final http.Client _client;
   WeatherService({http.Client? client}) : _client = client ?? http.Client();
 
-  // Valley center (McAllen) — used for current conditions / AQI.
+  // Valley center (McAllen) — fallback when no user location is available.
   static const double lat = 26.2034;
   static const double lon = -98.2300;
 
-  Future<WeatherSnapshot?> current() async {
+  Future<WeatherSnapshot?> current({double? atLat, double? atLon}) async {
+    final la = atLat ?? lat;
+    final lo = atLon ?? lon;
     try {
       final uri = Uri.parse(
-        'https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon'
+        'https://api.open-meteo.com/v1/forecast?latitude=$la&longitude=$lo'
         '&current=temperature_2m,apparent_temperature,relative_humidity_2m,'
         'wind_speed_10m,weather_code,precipitation'
-        '&hourly=apparent_temperature&temperature_unit=fahrenheit'
+        '&temperature_unit=fahrenheit'
         '&wind_speed_unit=mph&timezone=America%2FChicago&forecast_days=1',
       );
       final res =
@@ -192,16 +239,14 @@ class WeatherService {
       final cur = body['current'] as Map<String, dynamic>?;
       if (cur == null) return null;
       final temp = _parseDouble(cur['temperature_2m']) ?? 0;
+      final rh = _parseDouble(cur['relative_humidity_2m']) ?? 50;
       final feels = _parseDouble(cur['apparent_temperature']) ?? temp;
-      final heatIndex = _computeHeatIndex(
-        temp,
-        _parseDouble(cur['relative_humidity_2m']) ?? 50,
-      );
+      final heatIndex = _computeHeatIndex(temp, rh);
       final code = _parseInt(cur['weather_code']) ?? 0;
       return WeatherSnapshot(
         temperatureF: temp,
         feelsLikeF: feels,
-        humidity: (_parseDouble(cur['relative_humidity_2m']) ?? 50).round(),
+        humidity: rh.round(),
         windMph: _parseDouble(cur['wind_speed_10m']) ?? 0,
         condition: conditionForCode(code),
         weatherCode: code,
@@ -213,11 +258,13 @@ class WeatherService {
     }
   }
 
-  Future<AirQuality?> airQuality() async {
+  Future<AirQuality?> airQuality({double? atLat, double? atLon}) async {
+    final la = atLat ?? lat;
+    final lo = atLon ?? lon;
     try {
       final uri = Uri.parse(
         'https://air-quality-api.open-meteo.com/v1/air-quality'
-        '?latitude=$lat&longitude=$lon&current=us_aqi,pm2_5,pm10'
+        '?latitude=$la&longitude=$lo&current=us_aqi,pm2_5,pm10'
         '&timezone=America%2FChicago',
       );
       final res =
@@ -311,15 +358,24 @@ class RoadService {
       'https://services9.arcgis.com/EzaDBSfUmxFzUwnI/arcgis/rest/services/'
       'DriveTexas_Conditions_Points/FeatureServer/0/query';
 
-  Future<List<RoadEvent>> closures() async {
+  Future<List<RoadEvent>> closures({double? nearLat, double? nearLon}) async {
+    // Prefer a tighter envelope around the user; fall back to the whole Valley.
+    final la = nearLat ?? 26.2;
+    final lo = nearLon ?? -98.2;
+    final xmin = (lo - 0.9).toStringAsFixed(4);
+    final ymin = (la - 0.6).toStringAsFixed(4);
+    final xmax = (lo + 0.9).toStringAsFixed(4);
+    final ymax = (la + 0.6).toStringAsFixed(4);
     try {
+      final geom = '{"xmin":$xmin,"ymin":$ymin,"xmax":$xmax,"ymax":$ymax,'
+          '"spatialReference":{"wkid":4326}}';
       final uri = Uri.parse(
-        '$_base?where=1%3D1&geometry=%7B%22xmin%22%3A-99.2%2C%22ymin%22%3A25.8'
-        '%2C%22xmax%22%3A-97.1%2C%22ymax%22%3A26.6%2C%22spatialReference%22'
-        '%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryEnvelope'
-        '&inSR=4326&spatialRel=esriSpatialRelIntersects'
+        '$_base?where=1%3D1&geometry=${Uri.encodeComponent(geom)}'
+        '&geometryType=esriGeometryEnvelope&inSR=4326'
+        '&spatialRel=esriSpatialRelIntersects'
         '&outFields=condition%2Croute_name%2Cfrom_limit%2Cto_limit%2C'
-        'description%2Ccounty_num&returnGeometry=false&f=json&resultRecordCount=200',
+        'description%2Ccounty_num&returnGeometry=true&outSR=4326&f=json'
+        '&resultRecordCount=200',
       );
       final res =
           await _client.get(uri, headers: _headers()).timeout(const Duration(seconds: 12));
@@ -328,20 +384,24 @@ class RoadService {
       final features = body['features'] as List? ?? const [];
       final out = <RoadEvent>[];
       for (final f in features) {
-        final attrs = (f as Map)['attributes'] as Map<String, dynamic>?;
+        final m = f as Map;
+        final attrs = m['attributes'] as Map<String, dynamic>?;
         if (attrs == null) continue;
         final cond = '${attrs['condition'] ?? ''}'.toLowerCase();
         final desc = '${attrs['description'] ?? ''}';
+        final g = m['geometry'] as Map<String, dynamic>?;
+        final lat = _parseDouble(g?['y']) ?? _parseDouble(g?['latitude']) ?? 0;
+        final lon = _parseDouble(g?['x']) ?? _parseDouble(g?['longitude']) ?? 0;
         out.add(RoadEvent(
-          id: '$countySafe${out.length}-${attrs['route_name']}',
+          id: 'cd-${out.length}-${attrs['route_name']}',
           title: '${attrs['condition'] ?? 'Condition'}'.trim(),
           description: desc.trim().isEmpty
               ? '${attrs['from_limit'] ?? ''} → ${attrs['to_limit'] ?? ''}'
               : desc.trim(),
           route: '${attrs['route_name'] ?? ''}'.trim(),
           severity: _severityFor(cond),
-          lat: 0,
-          lon: 0,
+          lat: lat,
+          lon: lon,
         ));
       }
       return out;
@@ -349,8 +409,6 @@ class RoadService {
       return const [];
     }
   }
-
-  static const countySafe = 'cd';
 
   static RoadSeverity _severityFor(String condition) {
     if (condition.contains('clos') || condition.contains('closed')) {
