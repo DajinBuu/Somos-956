@@ -6,6 +6,7 @@ import '../local_data.dart';
 import '../models.dart';
 import '../notifications.dart';
 import '../services.dart';
+import '../widgets/mascot.dart';
 import 'common.dart';
 
 class HealthTab extends StatefulWidget {
@@ -331,10 +332,11 @@ class _HealthTabState extends State<HealthTab> {
                 onChanged: settings.setReminder,
               ),
               if (_members.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(s.t('no_members'),
-                      style: Theme.of(context).textTheme.bodySmall),
+                EmptyState(
+                  message: s.t('no_members'),
+                  mood: MascotMood.wave,
+                  actionLabel: s.t('add_member'),
+                  onAction: _addMemberDialog,
                 )
               else
                 for (var i = 0; i < _members.length; i++)
@@ -503,13 +505,15 @@ class _HealthTabState extends State<HealthTab> {
           children: [
             Row(
               children: [
-                const Icon(Icons.local_hospital, color: Colors.white),
-                const SizedBox(width: 8),
-                Text(s.t('health_title'),
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 17)),
+                const MascotAvatar(size: 46),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(s.t('health_title'),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 17)),
+                ),
               ],
             ),
             const SizedBox(height: 6),

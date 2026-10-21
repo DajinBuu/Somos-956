@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../l10n.dart';
+import '../widgets/mascot.dart';
 
 Color healthCareColor(int type) {
   switch (type) {
@@ -136,6 +137,7 @@ class SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Card(
       child: Padding(
         padding: padding,
@@ -143,9 +145,17 @@ class SectionCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icon, color: Theme.of(context).colorScheme.primary, size: 22),
-                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: scheme.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Icon(icon, color: scheme.primary, size: 20),
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -155,21 +165,68 @@ class SectionCard extends StatelessWidget {
                         style: Theme.of(context)
                             .textTheme
                             .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w700),
+                            ?.copyWith(fontWeight: FontWeight.w800),
                       ),
                       if (subtitle != null)
-                        Text(subtitle!,
-                            style: Theme.of(context).textTheme.bodySmall),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(subtitle!,
+                              style: Theme.of(context).textTheme.bodySmall),
+                        ),
                     ],
                   ),
                 ),
                 ?trailing,
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             child,
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A friendly empty-state placeholder featuring the mascot.
+class EmptyState extends StatelessWidget {
+  final String message;
+  final MascotMood mood;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  const EmptyState({
+    super.key,
+    required this.message,
+    this.mood = MascotMood.happy,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+      child: Column(
+        children: [
+          Mascot(size: 74, mood: mood),
+          const SizedBox(height: 10),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(height: 12),
+            FilledButton.tonalIcon(
+              onPressed: onAction,
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(actionLabel!),
+            ),
+          ],
+        ],
       ),
     );
   }

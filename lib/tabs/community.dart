@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import '../l10n.dart';
 import '../local_data.dart';
 import '../models.dart';
+import '../widgets/mascot.dart';
 import 'common.dart';
 
 class CommunityTab extends StatefulWidget {
@@ -364,8 +365,7 @@ class _CommunityTabState extends State<CommunityTab> {
                   style: const TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 6),
               if (settings.reports.isEmpty)
-                Text(s.t('no_reports'),
-                    style: Theme.of(context).textTheme.bodySmall)
+                EmptyState(message: s.t('no_reports'), mood: MascotMood.thinking)
               else
                 for (final r in settings.reports.reversed.take(10))
                   ListTile(
@@ -442,13 +442,15 @@ class _CommunityTabState extends State<CommunityTab> {
           children: [
             Row(
               children: [
-                const Icon(Icons.volunteer_activism, color: Colors.white),
-                const SizedBox(width: 8),
-                Text(s.t('community_title'),
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 17)),
+                const MascotAvatar(size: 46),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(s.t('community_title'),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 17)),
+                ),
               ],
             ),
             const SizedBox(height: 6),

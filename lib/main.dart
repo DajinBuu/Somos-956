@@ -5,8 +5,10 @@ import 'notifications.dart';
 import 'tabs/community.dart';
 import 'tabs/education.dart';
 import 'tabs/health.dart';
+import 'tabs/home.dart';
 import 'tabs/settings.dart';
 import 'tabs/transport.dart';
+import 'widgets/mascot.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,20 +38,48 @@ class Somos956App extends StatelessWidget {
             tertiary: const Color(0xFF6A1B9A),
             brightness: Brightness.light,
           ),
-          cardTheme: const CardThemeData(
-            elevation: 1.5,
-            margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          scaffoldBackgroundColor: const Color(0xFFFFFBF5),
+          cardTheme: CardThemeData(
+            elevation: 0.5,
+            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(16)),
+              borderRadius: BorderRadius.circular(18),
+              side: BorderSide(color: Colors.black.withValues(alpha: 0.05)),
             ),
           ),
-          appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
-          inputDecorationTheme: const InputDecorationTheme(
-            border: OutlineInputBorder(),
-            isDense: true,
+          appBarTheme: const AppBarTheme(
+            centerTitle: false,
+            elevation: 0,
+            scrolledUnderElevation: 1,
+            backgroundColor: Color(0xFFFFFBF5),
           ),
-          chipTheme: const ChipThemeData(
-            shape: StadiumBorder(),
+          inputDecorationTheme: InputDecorationTheme(
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+          ),
+          chipTheme: const ChipThemeData(shape: StadiumBorder()),
+          filledButtonTheme: FilledButtonThemeData(
+            style: FilledButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              textStyle:
+                  const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
+            ),
+          ),
+          navigationBarTheme: NavigationBarThemeData(
+            height: 66,
+            elevation: 3,
+            backgroundColor: Colors.white,
+            indicatorColor: const Color(0xFFC2410C).withValues(alpha: 0.14),
+            labelTextStyle: WidgetStateProperty.all(
+              const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+            ),
           ),
         ),
         home: const HomeShell(),
@@ -68,12 +98,12 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
 
-  static const _tabs = [
-    HealthTab(),
-    TransportTab(),
-    CommunityTab(),
-    EducationTab(),
-    SettingsTab(),
+  late final List<Widget> _tabs = [
+    HomeTab(onNavigate: (i) => setState(() => _index = i)),
+    const HealthTab(),
+    const TransportTab(),
+    const CommunityTab(),
+    const EducationTab(),
   ];
 
   @override
@@ -82,23 +112,29 @@ class _HomeShellState extends State<HomeShell> {
     final settings = LocaleScope.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: Row(
           children: [
-            Row(
-              children: [
-                const Icon(Icons.people_alt_rounded, size: 22),
-                const SizedBox(width: 8),
-                Text(s.t('app_title'),
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 20)),
-              ],
-            ),
-            Text(
-              s.t('tagline'),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+            const MascotAvatar(size: 38),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(s.t('app_title'),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w900, fontSize: 19)),
+                  Text(
+                    s.t('tagline'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 11.5,
+                        ),
                   ),
+                ],
+              ),
             ),
           ],
         ),
@@ -106,12 +142,24 @@ class _HomeShellState extends State<HomeShell> {
           TextButton(
             onPressed: () =>
                 settings.setLang(settings.lang == 'en' ? 'es' : 'en'),
+            style: TextButton.styleFrom(
+              minimumSize: const Size(44, 40),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+            ),
             child: Text(
               settings.lang == 'en' ? 'ES' : 'EN',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
             ),
           ),
-          const SizedBox(width: 4),
+          IconButton(
+            tooltip: s.t('settings'),
+            icon: const Icon(Icons.tune),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const _SettingsPage(),
+              ),
+            ),
+          ),
         ],
       ),
       body: SafeArea(
@@ -122,6 +170,10 @@ class _HomeShellState extends State<HomeShell> {
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: [
+          NavigationDestination(
+              icon: const Icon(Icons.home_outlined),
+              selectedIcon: const Icon(Icons.home),
+              label: s.t('nav_home')),
           NavigationDestination(
               icon: const Icon(Icons.local_hospital_outlined),
               selectedIcon: const Icon(Icons.local_hospital),
@@ -138,12 +190,21 @@ class _HomeShellState extends State<HomeShell> {
               icon: const Icon(Icons.school_outlined),
               selectedIcon: const Icon(Icons.school),
               label: s.t('nav_education')),
-          NavigationDestination(
-              icon: const Icon(Icons.settings_outlined),
-              selectedIcon: const Icon(Icons.settings),
-              label: s.t('settings')),
         ],
       ),
+    );
+  }
+}
+
+class _SettingsPage extends StatelessWidget {
+  const _SettingsPage();
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    return Scaffold(
+      appBar: AppBar(title: Text(s.t('settings'))),
+      body: const SettingsTab(),
     );
   }
 }

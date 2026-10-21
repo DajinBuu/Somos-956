@@ -56,6 +56,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Somos 956'), findsWidgets);
+    expect(find.text('Home'), findsWidgets);
     expect(find.text('Health'), findsWidgets);
     expect(find.text('Transport'), findsWidgets);
     expect(find.text('Community'), findsWidgets);
@@ -70,9 +71,10 @@ void main() {
     await tester.pump();
 
     await tester.tap(find.text('ES'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.text('Salud'), findsWidgets);
-    expect(find.text('Ajustes'), findsWidgets);
+    expect(find.text('Inicio'), findsWidgets);
   });
 }

@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import '../l10n.dart';
 import '../local_data.dart';
 import '../models.dart';
+import '../widgets/mascot.dart';
 import 'common.dart';
 
 class EducationTab extends StatefulWidget {
@@ -184,13 +185,15 @@ class _EducationTabState extends State<EducationTab> {
           children: [
             Row(
               children: [
-                const Icon(Icons.school, color: Colors.white),
-                const SizedBox(width: 8),
-                Text(s.t('education_title'),
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 17)),
+                const MascotAvatar(size: 46),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(s.t('education_title'),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 17)),
+                ),
               ],
             ),
             const SizedBox(height: 6),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../l10n.dart';
+import '../widgets/mascot.dart';
 import 'common.dart';
 
 class SettingsTab extends StatefulWidget {
@@ -109,25 +110,10 @@ class _SettingsTabState extends State<SettingsTab> {
   Widget _header(S s) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF37474F), Color(0xFF0E7490)],
-          ),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.settings, color: Colors.white),
-            const SizedBox(width: 8),
-            Text(s.t('settings'),
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 17)),
-          ],
-        ),
+      child: MascotBubble(
+        message: s.t('about_body'),
+        mood: MascotMood.wave,
+        mascotSize: 76,
       ),
     );
   }
