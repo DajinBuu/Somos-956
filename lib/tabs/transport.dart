@@ -47,7 +47,7 @@ class _TransportTabState extends State<TransportTab> {
   }
 
   Future<void> _enableLocation() async {
-    await locationService.ensure();
+    await showLocationPicker(context);
     if (mounted) _refresh();
   }
 
@@ -181,6 +181,20 @@ class _TransportTabState extends State<TransportTab> {
                                 onSelected: (v) =>
                                     setState(() => _nearestFirst = v),
                               ),
+                            const SizedBox(width: 8),
+                            ActionChip(
+                              avatar: Icon(
+                                  locationService.isManual
+                                      ? Icons.pin_drop
+                                      : Icons.my_location,
+                                  size: 16),
+                              label: Text(
+                                  locationService.isManual
+                                      ? s.t('manual_location')
+                                      : s.t('pick_location'),
+                                  style: const TextStyle(fontSize: 12)),
+                              onPressed: _enableLocation,
+                            ),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -496,7 +510,7 @@ class _TransportTabState extends State<TransportTab> {
                     lat: r.bridge.lat,
                     lon: r.bridge.lon,
                     label: r.bridge.name,
-                    origin: locationService.position,
+                    origin: locationService.origin,
                   ),
                   icon: const Icon(Icons.directions, size: 16),
                   label: Text(s.t('directions'),
@@ -652,7 +666,7 @@ class _TransportTabState extends State<TransportTab> {
                 lat: e.lat,
                 lon: e.lon,
                 label: e.route,
-                origin: locationService.position,
+                origin: locationService.origin,
               ),
             ),
         ],

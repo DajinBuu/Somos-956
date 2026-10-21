@@ -46,7 +46,7 @@ class _HealthTabState extends State<HealthTab> {
   }
 
   Future<void> _enableLocation() async {
-    await locationService.ensure();
+    await showLocationPicker(context);
     if (mounted) setState(() {});
   }
 
@@ -114,7 +114,7 @@ class _HealthTabState extends State<HealthTab> {
                       lat: f.lat,
                       lon: f.lon,
                       label: f.name,
-                      origin: locationService.position,
+                      origin: locationService.origin,
                     ),
                   ),
                 ),
@@ -303,13 +303,19 @@ class _HealthTabState extends State<HealthTab> {
                   _chip(s.t('filter_all'), null),
                   for (final t in CareType.values)
                     _chip(s.t(_styleFor(t).labelKey), t),
-                  if (!locationService.hasFix)
-                    ActionChip(
-                      avatar: const Icon(Icons.my_location, size: 16),
-                      label: Text(s.t('location_prompt'),
-                          style: const TextStyle(fontSize: 12)),
-                      onPressed: _enableLocation,
-                    ),
+                  ActionChip(
+                    avatar: Icon(
+                        locationService.isManual
+                            ? Icons.pin_drop
+                            : Icons.my_location,
+                        size: 16),
+                    label: Text(
+                        locationService.isManual
+                            ? s.t('manual_location')
+                            : s.t('pick_location'),
+                        style: const TextStyle(fontSize: 12)),
+                    onPressed: _enableLocation,
+                  ),
                 ],
               ),
               const SizedBox(height: 10),
@@ -362,7 +368,7 @@ class _HealthTabState extends State<HealthTab> {
                         lat: f.lat,
                         lon: f.lon,
                         label: f.name,
-                        origin: locationService.position,
+                        origin: locationService.origin,
                       ),
                     ),
                     onTap: () => _showFacility(f),

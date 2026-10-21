@@ -528,5 +528,23 @@ class S {
     'est_wait': {'en': 'estimated', 'es': 'estimado'},
     'port_status': {'en': 'Port status', 'es': 'Estado del puerto'},
     'nearest_bridge': {'en': 'Nearest bridge', 'es': 'Puente más cercano'},
+    'pick_location': {'en': 'Pick on map', 'es': 'Elegir en mapa'},
+    'pick_location_title': {
+      'en': 'Choose your location',
+      'es': 'Elija su ubicación',
+    },
+    'pick_location_hint': {
+      'en': 'Tap the map to drop a pin, or use your current location.',
+      'es': 'Toque el mapa para poner un pin, o use su ubicación actual.',
+    },
+    'use_current_location': {
+      'en': 'Use current location',
+      'es': 'Usar ubicación actual',
+    },
+    'set_location': {'en': 'Set location', 'es': 'Establecer ubicación'},
+    'clear_location': {'en': 'Clear pin', 'es': 'Quitar pin'},
+    'location_set': {'en': 'Location set', 'es': 'Ubicación establecida'},
+    'manual_location': {'en': 'Pinned on map', 'es': 'Fijado en el mapa'},
+    'cancel': {'en': 'Cancel', 'es': 'Cancelar'},
   };
 }

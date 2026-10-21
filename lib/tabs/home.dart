@@ -164,9 +164,12 @@ class _HomeTabState extends State<HomeTab> {
     final denied = locationService.status == LocStatus.denied ||
         locationService.status == LocStatus.deniedForever ||
         locationService.status == LocStatus.unsupported;
-    if (hasFix) {
-      return const SizedBox.shrink();
-    }
+    final title = locationService.isManual
+        ? s.t('manual_location')
+        : (denied ? s.t('location_blocked') : s.t('location_prompt'));
+    final subtitle = locationService.isManual || hasFix
+        ? s.t('pick_location_hint')
+        : (denied ? s.t('location_blocked_hint') : s.t('location_hint'));
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
       child: Material(
@@ -174,35 +177,35 @@ class _HomeTabState extends State<HomeTab> {
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
-          onTap: denied ? null : _enableLocation,
+          onTap: _pickLocation,
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                Icon(denied ? Icons.location_disabled : Icons.my_location,
+                Icon(
+                    locationService.isManual
+                        ? Icons.pin_drop
+                        : (hasFix
+                            ? Icons.my_location
+                            : (denied
+                                ? Icons.location_disabled
+                                : Icons.my_location)),
                     color: theme.colorScheme.secondary),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                          denied
-                              ? s.t('location_blocked')
-                              : s.t('location_prompt'),
+                      Text(title,
                           style: const TextStyle(
                               fontWeight: FontWeight.w700, fontSize: 13.5)),
-                      Text(
-                          denied
-                              ? s.t('location_blocked_hint')
-                              : s.t('location_hint'),
+                      Text(subtitle,
                           style: const TextStyle(fontSize: 12)),
                     ],
                   ),
                 ),
-                if (!denied)
-                  Icon(Icons.chevron_right,
-                      color: theme.colorScheme.secondary),
+                Icon(Icons.edit_location_alt,
+                    color: theme.colorScheme.secondary),
               ],
             ),
           ),
@@ -211,8 +214,8 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  Future<void> _enableLocation() async {
-    await locationService.ensure();
+  Future<void> _pickLocation() async {
+    await showLocationPicker(context);
     if (mounted) setState(_load);
   }
 
@@ -655,7 +658,7 @@ class _HomeTabState extends State<HomeTab> {
         lat: r.bridge.lat,
         lon: r.bridge.lon,
         label: r.bridge.name,
-        origin: locationService.position,
+        origin: locationService.origin,
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),

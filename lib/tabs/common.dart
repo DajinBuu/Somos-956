@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../l10n.dart';
+import '../location.dart';
 import '../widgets/mascot.dart';
 
 Color healthCareColor(int type) {
@@ -318,6 +319,163 @@ class MapPane extends StatelessWidget {
 
 const kValleyCenterLat = 26.2034;
 const kValleyCenterLon = -98.2300;
+
+/// Opens a bottom sheet where the user can drop a pin on the map (or use their
+/// current GPS location) to choose the location distances are measured from.
+Future<void> showLocationPicker(BuildContext context) async {
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (_) => const _LocationPickerSheet(),
+  );
+}
+
+class _LocationPickerSheet extends StatefulWidget {
+  const _LocationPickerSheet();
+
+  @override
+  State<_LocationPickerSheet> createState() => _LocationPickerSheetState();
+}
+
+class _LocationPickerSheetState extends State<_LocationPickerSheet> {
+  final _controller = MapController();
+  LatLng? _pin;
+  bool _gpsBusy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (locationService.hasFix) {
+      final (lat, lon) = locationService.reference;
+      _pin = LatLng(lat, lon);
+    }
+  }
+
+  Future<void> _useGps() async {
+    setState(() => _gpsBusy = true);
+    locationService.clearManual();
+    final p = await locationService.ensure();
+    if (!mounted) return;
+    setState(() {
+      _gpsBusy = false;
+      _pin = LatLng(
+        p?.latitude ?? locationService.reference.$1,
+        p?.longitude ?? locationService.reference.$2,
+      );
+    });
+    _controller.move(_pin!, 12);
+  }
+
+  void _save() {
+    final pin = _pin;
+    if (pin == null) return;
+    locationService.setManual(pin.latitude, pin.longitude);
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(S.of(context).t('location_set'))),
+    );
+  }
+
+  void _clear() {
+    locationService.clearManual();
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    final (clat, clon) = locationService.reference;
+    final center = _pin ?? LatLng(clat, clon);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.pin_drop, color: Color(0xFF0E7490)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(s.t('pick_location_title'),
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w800)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(s.t('pick_location_hint'),
+                style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                height: 320,
+                child: FlutterMap(
+                  mapController: _controller,
+                  options: MapOptions(
+                    initialCenter: center,
+                    initialZoom: 11,
+                    onTap: (_, point) => setState(() => _pin = point),
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'org.somos956.somos_956',
+                    ),
+                    if (_pin != null)
+                      MarkerLayer(markers: [
+                        Marker(
+                          point: _pin!,
+                          width: 40,
+                          height: 40,
+                          alignment: Alignment.topCenter,
+                          child: const Icon(Icons.location_on,
+                              color: Color(0xFFC62828), size: 40),
+                        ),
+                      ]),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _gpsBusy ? null : _useGps,
+                  icon: _gpsBusy
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.my_location, size: 18),
+                  label: Text(s.t('use_current_location')),
+                ),
+                const Spacer(),
+                if (locationService.isManual)
+                  TextButton(
+                    onPressed: _clear,
+                    child: Text(s.t('clear_location')),
+                  ),
+                const SizedBox(width: 4),
+                FilledButton.icon(
+                  onPressed: _pin == null ? null : _save,
+                  icon: const Icon(Icons.check, size: 18),
+                  label: Text(s.t('set_location')),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class InfoTile extends StatelessWidget {
   final IconData icon;

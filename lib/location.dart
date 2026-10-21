@@ -17,9 +17,16 @@ class LocationService {
   LocStatus _status = LocStatus.unknown;
   Future<Position?>? _inFlight;
 
+  // A location the user dropped on the map, used in place of (or before) GPS.
+  double? _manualLat;
+  double? _manualLon;
+  String? _manualLabel;
+
   Position? get position => _cached;
   LocStatus get status => _status;
-  bool get hasFix => _cached != null;
+  bool get hasFix => _cached != null || _manualLat != null;
+  bool get isManual => _manualLat != null;
+  String? get manualLabel => _manualLabel;
 
   static const double _valleyLat = 26.2034;
   static const double _valleyLon = -98.2300;
@@ -30,8 +37,25 @@ class LocationService {
 
   Future<Position?> ensure() {
     if (_cached != null) return Future<Position?>.value(_cached);
+    // A manual pin is a deliberate choice, so don't override it with GPS.
+    if (_manualLat != null) return Future<Position?>.value(null);
     // Share a single in-flight request so concurrent tabs only prompt once.
     return _inFlight ??= _resolve();
+  }
+
+  /// Sets a user-chosen location from the map picker.
+  void setManual(double lat, double lon, {String? label}) {
+    _manualLat = lat;
+    _manualLon = lon;
+    _manualLabel = label;
+    _status = LocStatus.granted;
+  }
+
+  /// Clears any manual pin so GPS / the Valley default is used again.
+  void clearManual() {
+    _manualLat = null;
+    _manualLon = null;
+    _manualLabel = null;
   }
 
   Future<Position?> _resolve() async {
@@ -69,9 +93,18 @@ class LocationService {
     }
   }
 
-  /// Reference point for distances: user fix if we have one, else the Valley.
-  (double lat, double lon) get reference =>
-      _cached == null ? (_valleyLat, _valleyLon) : (_cached!.latitude, _cached!.longitude);
+  /// Reference point for distances: manual pin, else user GPS fix, else the
+  /// Valley center.
+  (double lat, double lon) get reference {
+    if (_manualLat != null) return (_manualLat!, _manualLon!);
+    if (_cached != null) return (_cached!.latitude, _cached!.longitude);
+    return (_valleyLat, _valleyLon);
+  }
+
+  /// Origin for directions as a `(lat, lon)` record, or null when the Valley
+  /// default would be misleading.
+  (double, double)? get origin =>
+      hasFix ? reference : null;
 
   /// Great-circle distance in miles between two coordinates.
   static double miles(double lat1, double lon1, double lat2, double lon2) {
@@ -99,12 +132,11 @@ class LocationService {
     required double lat,
     required double lon,
     String? label,
-    Position? origin,
+    (double, double)? origin,
   }) async {
     final dest = '$lat,$lon';
-    final originParam = origin == null
-        ? ''
-        : '&origin=${origin.latitude},${origin.longitude}';
+    final originParam =
+        origin == null ? '' : '&origin=${origin.$1},${origin.$2}';
     // Universal Google Maps link works in browsers and the mobile apps.
     final uri = Uri.parse(
       'https://www.google.com/maps/dir/?api=1$originParam'

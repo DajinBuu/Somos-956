@@ -35,7 +35,7 @@ class _EducationTabState extends State<EducationTab> {
   }
 
   Future<void> _enableLocation() async {
-    await locationService.ensure();
+    await showLocationPicker(context);
     if (mounted) setState(() {});
   }
 
@@ -81,13 +81,19 @@ class _EducationTabState extends State<EducationTab> {
                       selected: _filter == t,
                       onSelected: (_) => setState(() => _filter = t),
                     ),
-                  if (!locationService.hasFix)
-                    ActionChip(
-                      avatar: const Icon(Icons.my_location, size: 16),
-                      label: Text(s.t('location_prompt'),
-                          style: const TextStyle(fontSize: 12)),
-                      onPressed: _enableLocation,
-                    ),
+                  ActionChip(
+                    avatar: Icon(
+                        locationService.isManual
+                            ? Icons.pin_drop
+                            : Icons.my_location,
+                        size: 16),
+                    label: Text(
+                        locationService.isManual
+                            ? s.t('manual_location')
+                            : s.t('pick_location'),
+                        style: const TextStyle(fontSize: 12)),
+                    onPressed: _enableLocation,
+                  ),
                 ],
               ),
               const SizedBox(height: 10),
@@ -159,7 +165,7 @@ class _EducationTabState extends State<EducationTab> {
                       lat: r.lat,
                       lon: r.lon,
                       label: r.name,
-                      origin: locationService.position,
+                      origin: locationService.origin,
                     ),
                   ),
                 IconButton(

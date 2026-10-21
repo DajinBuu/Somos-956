@@ -75,6 +75,21 @@ void main() {
     expect(kBridges.any((b) => b.city == 'Roma'), isTrue);
   });
 
+  test('manual location overrides distance reference', () {
+    final svc = LocationService();
+    expect(svc.hasFix, isFalse);
+    expect(svc.origin, isNull);
+    svc.setManual(25.9018, -97.4975);
+    expect(svc.hasFix, isTrue);
+    expect(svc.isManual, isTrue);
+    expect(svc.reference.$1, closeTo(25.9018, 0.0001));
+    expect(svc.distanceTo(26.2034, -98.2300), inInclusiveRange(45, 65));
+    expect(svc.origin, isNotNull);
+    svc.clearManual();
+    expect(svc.isManual, isFalse);
+    expect(svc.hasFix, isFalse);
+  });
+
   test('weather code mapping is friendly text', () {
     expect(WeatherService.conditionForCode(0), 'Clear');
     expect(WeatherService.conditionForCode(61), 'Rain');
