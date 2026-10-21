@@ -250,8 +250,8 @@ class _HealthTabState extends State<HealthTab> {
         _introCard(s),
         SectionCard(
           icon: Icons.emergency_outlined,
-          title: s.t('care_directory'),
-          subtitle: s.t('emergency_note'),
+          title: 'care_directory',
+          subtitle: 'emergency_note',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -312,8 +312,8 @@ class _HealthTabState extends State<HealthTab> {
         ),
         SectionCard(
           icon: Icons.family_restroom,
-          title: s.t('family_profiles'),
-          subtitle: s.t('profiles_hint'),
+          title: 'family_profiles',
+          subtitle: 'profiles_hint',
           trailing: IconButton(
             icon: const Icon(Icons.add_circle_outline),
             onPressed: _addMemberDialog,
@@ -346,8 +346,8 @@ class _HealthTabState extends State<HealthTab> {
         ),
         SectionCard(
           icon: Icons.translate,
-          title: s.t('term_decoder'),
-          subtitle: s.t('term_hint'),
+          title: 'term_decoder',
+          subtitle: 'term_hint',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

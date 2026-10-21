@@ -5,6 +5,7 @@ import '../local_data.dart';
 import '../models.dart';
 import '../services.dart';
 import '../widgets/mascot.dart';
+import 'common.dart';
 
 class HomeTab extends StatefulWidget {
   final void Function(int index) onNavigate;
@@ -16,12 +17,28 @@ class HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<HomeTab> {
   final _border = BorderService();
+  final _weather = WeatherService();
   late Future<List<BridgeReading>> _readings;
+  late Future<WeatherSnapshot?> _wx;
+  late Future<AirQuality?> _aqi;
+  late Future<List<WeatherAlert>> _alerts;
 
   @override
   void initState() {
     super.initState();
+    _load();
+  }
+
+  void _load() {
     _readings = _border.currentReadings();
+    _wx = _weather.current();
+    _aqi = _weather.airQuality();
+    _alerts = _weather.alerts();
+  }
+
+  Future<void> _refresh() async {
+    setState(_load);
+    await Future.wait<void>([_readings, _wx, _aqi, _alerts]);
   }
 
   String _greetingKey() {
@@ -43,12 +60,12 @@ class _HomeTabState extends State<HomeTab> {
     final s = S.of(context);
     final theme = Theme.of(context);
     return RefreshIndicator(
-      onRefresh: () async =>
-          setState(() => _readings = _border.currentReadings()),
+      onRefresh: _refresh,
       child: ListView(
         padding: const EdgeInsets.only(bottom: 28),
         children: [
           _hero(s, theme),
+          _liveBanner(s, theme),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
             child: Text(s.t('home_quick'),
@@ -127,6 +144,218 @@ class _HomeTabState extends State<HomeTab> {
         ],
       ),
     );
+  }
+
+  Widget _liveBanner(S s, ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      child: Card(
+        elevation: 0,
+        color: theme.colorScheme.surfaceContainerLow,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              FutureBuilder<List<WeatherAlert>>(
+                future: _alerts,
+                builder: (context, snap) {
+                  final alerts = snap.data ?? const <WeatherAlert>[];
+                  if (alerts.isEmpty) return const SizedBox.shrink();
+                  final a = alerts.first;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFC62828).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: const Color(0xFFC62828)
+                              .withValues(alpha: 0.35)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.warning_amber_rounded,
+                            color: Color(0xFFC62828)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(a.event,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFFC62828))),
+                              const SizedBox(height: 2),
+                              Text(
+                                a.headline.isNotEmpty
+                                    ? a.headline
+                                    : a.description,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 12.5),
+                              ),
+                              if (alerts.length > 1)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    '+${alerts.length - 1} ${s.t('alerts').toLowerCase()}',
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFFC62828)),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              Row(
+                children: [
+                  FutureBuilder<WeatherSnapshot?>(
+                    future: _wx,
+                    builder: (context, snap) {
+                      final w = snap.data;
+                      if (snap.connectionState != ConnectionState.done) {
+                        return const _LoadingChip();
+                      }
+                      if (w == null) return Expanded(child: _offlineChip(s));
+                      return Expanded(
+                        child: Row(
+                          children: [
+                            Icon(_weatherIcon(w.weatherCode),
+                                size: 34, color: const Color(0xFF0E7490)),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('${w.temperatureF.round()}°F',
+                                      style: const TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w900)),
+                                  Text(
+                                    '${w.condition} · ${s.t('feels_like')} ${w.feelsLikeF.round()}°',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.bodySmall,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 10),
+                  FutureBuilder<AirQuality?>(
+                    future: _aqi,
+                    builder: (context, snap) {
+                      final a = snap.data;
+                      if (a == null) return const SizedBox.shrink();
+                      final color = _aqiColor(a.aqi);
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text('AQI ${a.aqi}',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  color: color,
+                                  fontSize: 15)),
+                          Text(_aqiLabel(s, a.aqi),
+                              style: TextStyle(fontSize: 11, color: color)),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              FutureBuilder<WeatherSnapshot?>(
+                future: _wx,
+                builder: (context, snap) {
+                  final w = snap.data;
+                  if (w == null) return const SizedBox.shrink();
+                  return Row(
+                    children: [
+                      _miniInfo(theme, Icons.water_drop_outlined,
+                          '${w.humidity}%'),
+                      const SizedBox(width: 14),
+                      _miniInfo(theme, Icons.air,
+                          '${w.windMph.round()} mph'),
+                      if (w.heatIndexF != null) ...[
+                        const SizedBox(width: 14),
+                        _miniInfo(theme, Icons.thermostat,
+                            '${s.t('heat_index')} ${w.heatIndexF!.round()}°'),
+                      ],
+                      const Spacer(),
+                      LiveBadge(live: true, label: s.t('data_live')),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _miniInfo(ThemeData theme, IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 15, color: theme.colorScheme.secondary),
+        const SizedBox(width: 4),
+        Text(text, style: const TextStyle(fontSize: 12.5)),
+      ],
+    );
+  }
+
+  Widget _offlineChip(S s) {
+    return Row(
+      children: [
+        const Icon(Icons.cloud_off, size: 18, color: Colors.blueGrey),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(s.t('load_error'),
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12.5, color: Colors.blueGrey)),
+        ),
+      ],
+    );
+  }
+
+  static IconData _weatherIcon(int code) {
+    if (code == 0) return Icons.wb_sunny;
+    if (code <= 3) return Icons.wb_cloudy;
+    if (code == 45 || code == 48) return Icons.foggy;
+    if (code >= 51 && code <= 67) return Icons.grain;
+    if (code >= 80 && code <= 82) return Icons.umbrella;
+    if (code >= 95) return Icons.thunderstorm;
+    return Icons.cloud;
+  }
+
+  static Color _aqiColor(int aqi) {
+    if (aqi <= 50) return const Color(0xFF2E7D32);
+    if (aqi <= 100) return const Color(0xFFF9A825);
+    if (aqi <= 150) return const Color(0xFFEF6C00);
+    if (aqi <= 200) return const Color(0xFFC62828);
+    if (aqi <= 300) return const Color(0xFF6A1B9A);
+    return const Color(0xFF7F1D1D);
+  }
+
+  static String _aqiLabel(S s, int aqi) {
+    if (aqi <= 50) return s.t('aqi_good');
+    if (aqi <= 100) return s.t('aqi_moderate');
+    if (aqi <= 150) return s.t('aqi_unhealthy_sensitive');
+    if (aqi <= 200) return s.t('aqi_unhealthy');
+    if (aqi <= 300) return s.t('aqi_very_unhealthy');
+    return s.t('aqi_hazardous');
   }
 
   Widget _quickGrid(S s, ThemeData theme) {
@@ -419,6 +648,26 @@ class _HomeTabState extends State<HomeTab> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _LoadingChip extends StatelessWidget {
+  const _LoadingChip();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Expanded(
+      child: Row(
+        children: [
+          SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2)),
+          SizedBox(width: 8),
+          Text('…', style: TextStyle(fontSize: 13)),
+        ],
       ),
     );
   }

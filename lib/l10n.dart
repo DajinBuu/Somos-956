@@ -1,20 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Language display modes selected on first launch.
+enum LangMode {
+  english, // English only
+  spanish, // Español only
+  bilingual, // English with a smaller Spanish line beneath
+}
+
 class AppSettings extends ChangeNotifier {
+  /// Primary language code: 'en' or 'es'.
   String lang = 'en';
+
+  /// When true, show the other language as a smaller secondary line.
+  bool bilingual = false;
+
+  /// False until the very first language choice has been made.
+  bool onboarded = true;
+
   bool reminderOn = true;
   final Set<String> savedResources = {};
   final List<Map<String, String>> reports = [];
 
   static const _kLang = 'lang';
+  static const _kBilingual = 'bilingual';
+  static const _kOnboarded = 'onboarded';
   static const _kReminder = 'reminder_on';
   static const _kSaved = 'saved_resources';
   static const _kReports = 'reports';
 
+  LangMode get mode => bilingual
+      ? LangMode.bilingual
+      : (lang == 'es' ? LangMode.spanish : LangMode.english);
+
   Future<void> load() async {
     final p = await SharedPreferences.getInstance();
     lang = p.getString(_kLang) ?? 'en';
+    bilingual = p.getBool(_kBilingual) ?? false;
+    onboarded = p.getBool(_kOnboarded) ?? false;
     reminderOn = p.getBool(_kReminder) ?? true;
     savedResources
       ..clear()
@@ -35,6 +58,29 @@ class AppSettings extends ChangeNotifier {
 
   void setLang(String l) {
     lang = l;
+    notifyListeners();
+    _save();
+  }
+
+  void setMode(LangMode m) {
+    switch (m) {
+      case LangMode.english:
+        lang = 'en';
+        bilingual = false;
+      case LangMode.spanish:
+        lang = 'es';
+        bilingual = false;
+      case LangMode.bilingual:
+        lang = 'en';
+        bilingual = true;
+    }
+    onboarded = true;
+    notifyListeners();
+    _save();
+  }
+
+  void setBilingual(bool v) {
+    bilingual = v;
     notifyListeners();
     _save();
   }
@@ -68,6 +114,8 @@ class AppSettings extends ChangeNotifier {
   Future<void> _save() async {
     final p = await SharedPreferences.getInstance();
     await p.setString(_kLang, lang);
+    await p.setBool(_kBilingual, bilingual);
+    await p.setBool(_kOnboarded, onboarded);
     await p.setBool(_kReminder, reminderOn);
     await p.setStringList(_kSaved, savedResources.toList());
     await p.setStringList(
@@ -89,19 +137,71 @@ class LocaleScope extends InheritedNotifier<AppSettings> {
 
 class S {
   final String lang;
-  const S(this.lang);
+  final bool bilingual;
+  const S(this.lang, {this.bilingual = false});
 
-  static S of(BuildContext context) => S(LocaleScope.of(context).lang);
+  static S of(BuildContext context) {
+    final settings = LocaleScope.of(context);
+    return S(settings.lang, bilingual: settings.bilingual);
+  }
+
   bool get es => lang == 'es';
 
-  String pick(String en, String esText) => lang == 'es' ? esText : en;
+  /// The secondary language code shown under the primary in bilingual mode.
+  String get secondaryLang => lang == 'es' ? 'en' : 'es';
 
-  String t(String key, [Map<String, String> args = const {}]) {
+  String _tIn(String code, String key, Map<String, String> args) {
     final row = _table[key];
-    var s = (row == null) ? key : (row[lang] ?? row['en'] ?? key);
+    var s = (row == null) ? key : (row[code] ?? row['en'] ?? key);
     args.forEach((k, v) => s = s.replaceAll('{$k}', v));
     return s;
   }
+
+  String t(String key, [Map<String, String> args = const {}]) =>
+      _tIn(lang, key, args);
+
+  /// Secondary-language text for a key (empty when key is unknown).
+  String tSecondary(String key, [Map<String, String> args = const {}]) =>
+      _tIn(secondaryLang, key, args);
+
+  /// Primary text for a bilingual en/es pair.
+  String pick(String en, String esText) => lang == 'es' ? esText : en;
+
+  /// Secondary text for a bilingual en/es pair.
+  String pickSecondary(String en, String esText) =>
+      lang == 'es' ? en : esText;
+
+  /// A widget that shows the primary text and, in bilingual mode, a smaller
+  /// secondary line beneath it in a muted style.
+  Widget b(String en, String esText, {double size = 14, FontWeight weight = FontWeight.normal, Color? color}) {
+    if (!bilingual) {
+      return Text(
+        pick(en, esText),
+        style: TextStyle(fontSize: size, fontWeight: weight, color: color),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          pick(en, esText),
+          style: TextStyle(fontSize: size, fontWeight: weight, color: color),
+        ),
+        Text(
+          pickSecondary(en, esText),
+          style: TextStyle(
+            fontSize: size * 0.82,
+            color: (color ?? Colors.black87).withValues(alpha: 0.6),
+            height: 1.2,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Bilingual-aware lookup for a translation-table key.
+  Widget tk(String key, {double size = 14, FontWeight weight = FontWeight.normal, Color? color}) =>
+      b(t(key), tSecondary(key), size: size, weight: weight, color: color);
 
   static const Map<String, Map<String, String>> _table = {
     'app_title': {'en': 'Somos 956', 'es': 'Somos 956'},
@@ -251,8 +351,8 @@ class S {
     'eta_when': {'en': 'When do you plan to cross?', 'es': '¿Cuándo piensa cruzar?'},
     'eta_result': {'en': 'Predicted wait', 'es': 'Espera predicha'},
     'ai_engine_note': {
-      'en': 'Predictions use live telemetry plus a historical time-of-day model. Connect CBP / TxDOT feeds to go fully live.',
-      'es': 'Las predicciones usan telemetría en vivo y un modelo histórico por hora del día. Conecte fuentes de CBP / TxDOT para datos totalmente reales.',
+      'en': 'Bridge waits are live from U.S. CBP. These hour-by-hour bars are an estimate based on typical traffic — verify before you drive.',
+      'es': 'Las esperas en los puentes son en vivo de CBP de EE. UU. Estas barras por hora son una estimación según el tráfico típico — verifique antes de conducir.',
     },
 
     // Community
@@ -355,5 +455,60 @@ class S {
       'en': 'Not a substitute for professional medical, legal, or financial advice.',
       'es': 'No sustituye el consejo médico, legal o financiero profesional.',
     },
+
+    // Onboarding / language choice
+    'onb_choose': {'en': 'Choose your language', 'es': 'Elija su idioma'},
+    'onb_subtitle': {
+      'en': 'You can change this any time in Settings.',
+      'es': 'Puede cambiarlo cuando quiera en Ajustes.',
+    },
+    'onb_english': {'en': 'English', 'es': 'English'},
+    'onb_english_sub': {'en': 'Show everything in English', 'es': 'Todo en inglés'},
+    'onb_spanish': {'en': 'Español', 'es': 'Español'},
+    'onb_spanish_sub': {'en': 'Todo en español', 'es': 'Show everything in Spanish'},
+    'onb_bilingual': {'en': 'Bilingual', 'es': 'Bilingüe'},
+    'onb_bilingual_sub': {
+      'en': 'English, with Spanish underneath',
+      'es': 'Inglés, con español debajo',
+    },
+    'onb_continue': {'en': 'Continue', 'es': 'Continuar'},
+    'onb_welcome': {
+      'en': 'Hi, I’m Solecito! Let’s set up your app.',
+      'es': '¡Hola, soy Solecito! Vamos a configurar tu app.',
+    },
+    'lang_mode': {'en': 'Display language', 'es': 'Idioma de pantalla'},
+    'bilingual_show': {'en': 'Show secondary language', 'es': 'Mostrar idioma secundario'},
+
+    // Live data
+    'data_live': {'en': 'Live', 'es': 'En vivo'},
+    'data_offline': {'en': 'Offline', 'es': 'Sin conexión'},
+    'data_connecting': {'en': 'Connecting…', 'es': 'Conectando…'},
+    'data_source': {'en': 'Source', 'es': 'Fuente'},
+    'data_updated_just_now': {'en': 'just now', 'es': 'ahora mismo'},
+    'weather': {'en': 'Weather', 'es': 'Clima'},
+    'air_quality': {'en': 'Air quality', 'es': 'Calidad del aire'},
+    'alerts': {'en': 'Alerts', 'es': 'Alertas'},
+    'no_alerts': {'en': 'No active alerts', 'es': 'Sin alertas activas'},
+    'feels_like': {'en': 'Feels like', 'es': 'Sensación'},
+    'humidity': {'en': 'Humidity', 'es': 'Humedad'},
+    'wind': {'en': 'Wind', 'es': 'Viento'},
+    'aqi_good': {'en': 'Good', 'es': 'Buena'},
+    'aqi_moderate': {'en': 'Moderate', 'es': 'Moderada'},
+    'aqi_unhealthy_sensitive': {'en': 'Unhealthy for sensitive groups', 'es': 'Dañina para grupos sensibles'},
+    'aqi_unhealthy': {'en': 'Unhealthy', 'es': 'Dañina'},
+    'aqi_very_unhealthy': {'en': 'Very unhealthy', 'es': 'Muy dañina'},
+    'aqi_hazardous': {'en': 'Hazardous', 'es': 'Peligrosa'},
+    'heat_index': {'en': 'Heat index', 'es': 'Índice de calor'},
+    'today_forecast': {'en': 'Today', 'es': 'Hoy'},
+    'road_closures': {'en': 'Road conditions & closures', 'es': 'Condiciones y cierres de carreteras'},
+    'no_closures': {'en': 'No reported closures right now', 'es': 'Sin cierres reportados ahora'},
+    'live_now': {'en': 'Live now', 'es': 'En vivo ahora'},
+    'refreshing': {'en': 'Refreshing…', 'es': 'Actualizando…'},
+    'try_again': {'en': 'Try again', 'es': 'Reintentar'},
+    'load_error': {
+      'en': 'Couldn’t reach the live feed. Showing the best available info.',
+      'es': 'No se pudo conectar a la fuente en vivo. Mostrando la mejor información disponible.',
+    },
+    'my_location': {'en': 'My area', 'es': 'Mi zona'},
   };
 }

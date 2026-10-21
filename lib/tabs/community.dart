@@ -82,7 +82,7 @@ class _CommunityTabState extends State<CommunityTab> {
         _introCard(s),
         SectionCard(
           icon: Icons.list_alt,
-          title: s.t('resources'),
+          title: 'resources',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -199,8 +199,8 @@ class _CommunityTabState extends State<CommunityTab> {
         ),
         SectionCard(
           icon: Icons.rule,
-          title: s.t('eligibility'),
-          subtitle: s.t('eligibility_hint'),
+          title: 'eligibility',
+          subtitle: 'eligibility_hint',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -307,8 +307,8 @@ class _CommunityTabState extends State<CommunityTab> {
         ),
         SectionCard(
           icon: Icons.campaign_outlined,
-          title: s.t('report'),
-          subtitle: s.t('report_hint'),
+          title: 'report',
+          subtitle: 'report_hint',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -382,8 +382,8 @@ class _CommunityTabState extends State<CommunityTab> {
         ),
         SectionCard(
           icon: Icons.flag_outlined,
-          title: s.t('cultural_tips'),
-          subtitle: s.t('cultural_hint'),
+          title: 'cultural_tips',
+          subtitle: 'cultural_hint',
           child: Column(
             children: [
               for (final t in kCulturalTips)

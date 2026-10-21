@@ -13,22 +13,32 @@ void main() {
   test('bilingual table returns English and Spanish', () {
     const en = S('en');
     const es = S('es');
+    const bi = S('en', bilingual: true);
     expect(en.t('app_title'), 'Somos 956');
     expect(en.t('nav_health'), 'Health');
     expect(es.t('nav_health'), 'Salud');
     expect(en.pick('Hello', 'Hola'), 'Hello');
     expect(es.pick('Hello', 'Hola'), 'Hola');
+    expect(bi.pickSecondary('Hello', 'Hola'), 'Hola');
+    expect(bi.secondaryLang, 'es');
   });
 
   test('seed data is populated', () {
     expect(kCareFacilities, isNotEmpty);
     expect(kMedicalTerms, isNotEmpty);
     expect(kBridges, isNotEmpty);
-    expect(kCorridors, isNotEmpty);
     expect(kCommunityResources, isNotEmpty);
     expect(kEligibilityPrograms, isNotEmpty);
     expect(kCulturalTips, isNotEmpty);
     expect(kEduResources, isNotEmpty);
+  });
+
+  test('bridges carry real CBP port numbers', () {
+    expect(kBridges, isNotEmpty);
+    for (final b in kBridges) {
+      expect(b.portNumber, isNotEmpty);
+      expect(int.tryParse(b.portNumber), isNotNull);
+    }
   });
 
   test('bridge wait model returns a bounded value', () {
@@ -41,6 +51,12 @@ void main() {
     expect(forecast, isNotEmpty);
   });
 
+  test('weather code mapping is friendly text', () {
+    expect(WeatherService.conditionForCode(0), 'Clear');
+    expect(WeatherService.conditionForCode(61), 'Rain');
+    expect(WeatherService.conditionForCode(95), 'Thunderstorm');
+  });
+
   test('term decoder finds a known term', () {
     final decoder = TermDecoder();
     final hit = decoder.lookup('hypertension');
@@ -48,8 +64,22 @@ void main() {
     expect(hit!.term.toLowerCase(), contains('hypertension'));
   });
 
-  testWidgets('app shell renders all navigation tabs', (tester) async {
+  testWidgets('first launch shows the language chooser', (tester) async {
     SharedPreferences.setMockInitialValues({});
+    final settings = AppSettings();
+    await settings.load();
+    await tester.pumpWidget(Somos956App(settings: settings));
+    await tester.pump();
+
+    expect(find.text('Choose your language'), findsWidgets);
+    expect(find.text('English'), findsWidgets);
+    expect(find.text('Español'), findsWidgets);
+    expect(find.text('Bilingual · Bilingüe'), findsWidgets);
+  });
+
+  testWidgets('app shell renders all navigation tabs after onboarding',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({'onboarded': true, 'lang': 'en'});
     final settings = AppSettings();
     await settings.load();
     await tester.pumpWidget(Somos956App(settings: settings));
@@ -64,7 +94,7 @@ void main() {
   });
 
   testWidgets('language toggle switches labels', (tester) async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({'onboarded': true, 'lang': 'en'});
     final settings = AppSettings();
     await settings.load();
     await tester.pumpWidget(Somos956App(settings: settings));
@@ -76,5 +106,41 @@ void main() {
 
     expect(find.text('Salud'), findsWidgets);
     expect(find.text('Inicio'), findsWidgets);
+  });
+
+  testWidgets('bilingual mode shows both languages', (tester) async {
+    SharedPreferences.setMockInitialValues(
+        {'onboarded': true, 'lang': 'en', 'bilingual': true});
+    final settings = AppSettings();
+    await settings.load();
+    await tester.pumpWidget(Somos956App(settings: settings));
+    await tester.pump();
+
+    expect(find.text('Home'), findsWidgets);
+    await tester.tap(find.text('Transport').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('International bridges'), findsOneWidget);
+    expect(find.text('Puentes internacionales'), findsOneWidget);
+  });
+
+  testWidgets('onboarding selection completes and persists', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final settings = AppSettings();
+    await settings.load();
+    await tester.pumpWidget(Somos956App(settings: settings));
+    await tester.pump();
+
+    expect(find.text('Choose your language'), findsWidgets);
+    final cta = find.textContaining('Continue · Continuar');
+    await tester.ensureVisible(cta);
+    await tester.pump();
+    await tester.tap(cta);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(settings.onboarded, isTrue);
+    expect(find.text('Home'), findsWidgets);
   });
 }

@@ -23,30 +23,44 @@ class _SettingsTabState extends State<SettingsTab> {
         _header(s),
         SectionCard(
           icon: Icons.translate,
-          title: s.t('language'),
-          child: RadioGroup<String>(
-            groupValue: settings.lang,
-            onChanged: (v) => settings.setLang(v ?? 'en'),
-            child: Column(
-              children: [
-                RadioListTile<String>(
-                  contentPadding: EdgeInsets.zero,
-                  value: 'en',
-                  title: const Text('English'),
-                ),
-                RadioListTile<String>(
-                  contentPadding: EdgeInsets.zero,
-                  value: 'es',
-                  title: const Text('Español'),
-                ),
-              ],
-            ),
+          title: 'lang_mode',
+          subtitle: 'onb_subtitle',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SegmentedButton<LangMode>(
+                showSelectedIcon: false,
+                segments: [
+                  ButtonSegment(
+                    value: LangMode.english,
+                    label: Text('English', style: TextStyle(fontSize: 12.5)),
+                  ),
+                  ButtonSegment(
+                    value: LangMode.spanish,
+                    label: Text('Español', style: TextStyle(fontSize: 12.5)),
+                  ),
+                  ButtonSegment(
+                    value: LangMode.bilingual,
+                    label: Text('Bilingüe', style: TextStyle(fontSize: 12.5)),
+                  ),
+                ],
+                selected: {settings.mode},
+                onSelectionChanged: (v) => settings.setMode(v.first),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                settings.mode == LangMode.bilingual
+                    ? 'English + Español'
+                    : (settings.mode == LangMode.spanish ? 'Español' : 'English'),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
           ),
         ),
         SectionCard(
           icon: Icons.notifications_active_outlined,
-          title: s.t('reminders'),
-          subtitle: s.t('reminders_hint'),
+          title: 'reminders',
+          subtitle: 'reminders_hint',
           child: SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: Text(s.t('reminders_enable')),
@@ -57,7 +71,7 @@ class _SettingsTabState extends State<SettingsTab> {
         ),
         SectionCard(
           icon: Icons.bookmarks_outlined,
-          title: s.t('saved_resources'),
+          title: 'saved_resources',
           child: settings.savedResources.isEmpty
               ? Text(s.t('saved_empty'),
                   style: Theme.of(context).textTheme.bodySmall)
@@ -82,7 +96,7 @@ class _SettingsTabState extends State<SettingsTab> {
         ),
         SectionCard(
           icon: Icons.info_outline,
-          title: s.t('about'),
+          title: 'about',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

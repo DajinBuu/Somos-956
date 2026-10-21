@@ -41,8 +41,8 @@ class _EducationTabState extends State<EducationTab> {
         _introCard(s),
         SectionCard(
           icon: Icons.school_outlined,
-          title: s.t('education_title'),
-          subtitle: s.t('education_intro'),
+          title: 'education_title',
+          subtitle: 'education_intro',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

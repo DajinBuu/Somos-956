@@ -17,10 +17,10 @@ class TransportTab extends StatefulWidget {
 
 class _TransportTabState extends State<TransportTab> {
   final _border = BorderService();
-  final _corridors = CorridorService();
+  final _roads = RoadService();
 
   late Future<List<BridgeReading>> _readings;
-  List<Corridor> _live = const [];
+  late Future<List<RoadEvent>> _closures;
   DateTime _updated = DateTime.now();
   bool _commercial = false;
 
@@ -36,7 +36,7 @@ class _TransportTabState extends State<TransportTab> {
   void _refresh() {
     setState(() {
       _readings = _border.currentReadings(commercial: _commercial);
-      _live = _corridors.current();
+      _closures = _roads.closures();
       _updated = DateTime.now();
     });
   }
@@ -53,11 +53,18 @@ class _TransportTabState extends State<TransportTab> {
         BridgeState.heavy => s.t('bridge_heavy'),
       };
 
-  String _corridorLabel(S s, CorridorLevel l) => switch (l) {
-        CorridorLevel.light => s.t('traffic_light'),
-        CorridorLevel.moderate => s.t('traffic_moderate'),
-        CorridorLevel.heavy => s.t('traffic_heavy'),
-        CorridorLevel.severe => s.t('traffic_severe'),
+  String _roadLabel(S s, RoadSeverity sev) => switch (sev) {
+        RoadSeverity.closure => s.t('traffic_severe'),
+        RoadSeverity.major => s.t('traffic_heavy'),
+        RoadSeverity.minor => s.t('traffic_moderate'),
+        RoadSeverity.info => s.t('traffic_light'),
+      };
+
+  Color _roadColor(RoadSeverity sev) => switch (sev) {
+        RoadSeverity.closure => const Color(0xFFC62828),
+        RoadSeverity.major => const Color(0xFFEF6C00),
+        RoadSeverity.minor => const Color(0xFFF9A825),
+        RoadSeverity.info => const Color(0xFF0E7490),
       };
 
   @override
@@ -72,7 +79,7 @@ class _TransportTabState extends State<TransportTab> {
           _introCard(s),
           SectionCard(
             icon: Icons.directions_car,
-            title: s.t('bridges'),
+            title: 'bridges',
             trailing: TextButton.icon(
               onPressed: _refresh,
               icon: const Icon(Icons.refresh, size: 18),
@@ -131,6 +138,23 @@ class _TransportTabState extends State<TransportTab> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        MapPane(
+                          markers: [
+                            for (final r in data)
+                              MapMarker(
+                                point: LatLng(
+                                    r.bridge.lat, r.bridge.lon),
+                                color: _bridgeColor(r.state),
+                                icon: Icons.directions_car,
+                                label:
+                                    '${r.bridge.name}: ${r.waitMinutes} ${s.t('min')}',
+                              ),
+                          ],
+                          center: const LatLng(26.05, -98.0),
+                          zoom: 8.6,
+                          height: 280,
+                        ),
+                        const SizedBox(height: 10),
                         for (final r in data) _bridgeCard(context, s, r, es),
                         const SizedBox(height: 4),
                         Row(
@@ -149,25 +173,20 @@ class _TransportTabState extends State<TransportTab> {
           ),
           SectionCard(
             icon: Icons.auto_awesome,
-            title: s.t('forecast'),
-            trailing: const AiBadge(),
+            title: 'forecast',
+            subtitle: 'ai_engine_note',
+            trailing: const AiBadge(label: 'Estimate'),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 for (final b in _bridgeList())
                   _forecastStrip(context, s, b),
-                const SizedBox(height: 4),
-                Text(s.t('ai_engine_note'),
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: Colors.black54)),
               ],
             ),
           ),
           SectionCard(
             icon: Icons.calculate_outlined,
-            title: s.t('eta_calculator'),
+            title: 'eta_calculator',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -232,28 +251,58 @@ class _TransportTabState extends State<TransportTab> {
             ),
           ),
           SectionCard(
-            icon: Icons.traffic_outlined,
-            title: s.t('corridors'),
-            trailing: LiveBadge(live: false),
-            child: Column(
-              children: [
-                MapPane(
-                  markers: [
-                    for (final c in _live)
-                      MapMarker(
-                        point: LatLng(c.lat, c.lon),
-                        color: levelColor(CorridorLevel.values.indexOf(c.level)),
-                        icon: Icons.traffic,
-                        label: '${c.name}: ${c.segment}',
-                      ),
+            icon: Icons.construction_outlined,
+            title: 'road_closures',
+            trailing: FutureBuilder<List<RoadEvent>>(
+              future: _closures,
+              builder: (context, snap) => LiveBadge(
+                live: snap.connectionState == ConnectionState.done &&
+                    (snap.data?.isNotEmpty ?? false),
+                label: snap.data?.isEmpty ?? true
+                    ? s.t('data_live')
+                    : s.t('data_live'),
+              ),
+            ),
+            child: FutureBuilder<List<RoadEvent>>(
+              future: _closures,
+              builder: (context, snap) {
+                if (snap.connectionState != ConnectionState.done) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Center(
+                        child: SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2.5))),
+                  );
+                }
+                final events = snap.data ?? const <RoadEvent>[];
+                if (events.isEmpty) {
+                  return EmptyState(
+                    message: s.t('no_closures'),
+                    mood: MascotMood.happy,
+                  );
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final e in events.take(12)) _roadRow(context, s, e),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.info_outline, size: 13),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            '${s.t('data_source')}: TxDOT DriveTexas',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
-                  center: const LatLng(26.19, -98.0),
-                  zoom: 8.8,
-                  height: 300,
-                ),
-                const SizedBox(height: 10),
-                for (final c in _live) _corridorRow(context, s, c),
-              ],
+                );
+              },
             ),
           ),
         ],
@@ -302,9 +351,20 @@ class _TransportTabState extends State<TransportTab> {
                       Text(
                           '${es ? r.bridge.cityEs : r.bridge.city} · ${r.bridge.crossing}',
                           style: Theme.of(context).textTheme.bodySmall),
-                      Text(_bridgeLabel(s, r.state),
-                          style: TextStyle(
-                              color: color, fontWeight: FontWeight.w600)),
+                      Row(
+                        children: [
+                          Text(_bridgeLabel(s, r.state),
+                              style: TextStyle(
+                                  color: color, fontWeight: FontWeight.w600)),
+                          const SizedBox(width: 6),
+                          if (r.live)
+                            const Icon(Icons.cell_tower,
+                                size: 12, color: Colors.green)
+                          else
+                            const Icon(Icons.schedule,
+                                size: 12, color: Colors.blueGrey),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -323,6 +383,26 @@ class _TransportTabState extends State<TransportTab> {
               ],
             ),
             const SizedBox(height: 6),
+            if (r.passengerWait != null ||
+                r.commercialWait != null ||
+                r.pedestrianWait != null) ...[
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  if (r.passengerWait != null)
+                    _laneChip(context, Icons.person, s.t('passenger_mode'),
+                        r.passengerWait!),
+                  if (r.commercialWait != null)
+                    _laneChip(context, Icons.local_shipping, s.t('cargo_mode'),
+                        r.commercialWait!),
+                  if (r.pedestrianWait != null)
+                    _laneChip(context, Icons.directions_walk,
+                        s.t('pedestrian'), r.pedestrianWait!),
+                ],
+              ),
+              const SizedBox(height: 6),
+            ],
             Row(
               children: [
                 const Icon(Icons.schedule, size: 14, color: Colors.black54),
@@ -333,6 +413,32 @@ class _TransportTabState extends State<TransportTab> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _laneChip(
+      BuildContext context, IconData icon, String label, int minutes) {
+    final color = BorderService.stateFor(minutes) == BridgeState.heavy
+        ? const Color(0xFFC62828)
+        : BorderService.stateFor(minutes) == BridgeState.slow
+            ? const Color(0xFFF9A825)
+            : const Color(0xFF2E7D32);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 4),
+          Text('$label: $minutes min',
+              style: TextStyle(fontSize: 11.5, color: color, fontWeight: FontWeight.w600)),
+        ],
       ),
     );
   }
@@ -389,13 +495,15 @@ class _TransportTabState extends State<TransportTab> {
     );
   }
 
-  Widget _corridorRow(BuildContext context, S s, Corridor c) {
-    final color = levelColor(CorridorLevel.values.indexOf(c.level));
+  Widget _roadRow(BuildContext context, S s, RoadEvent e) {
+    final color = _roadColor(e.severity);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
+            margin: const EdgeInsets.only(top: 3),
             width: 10,
             height: 10,
             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
@@ -405,23 +513,43 @@ class _TransportTabState extends State<TransportTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(s.es ? c.nameEs : c.name,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 13)),
-                Text(c.segment,
-                    style: Theme.of(context).textTheme.bodySmall),
+                Row(
+                  children: [
+                    if (e.route.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.only(right: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(e.route,
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: color)),
+                      ),
+                    Expanded(
+                      child: Text(e.title,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 13.5)),
+                    ),
+                  ],
+                ),
+                if (e.description.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(e.description,
+                        style: Theme.of(context).textTheme.bodySmall),
+                  ),
               ],
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(_corridorLabel(s, c.level),
-                  style: TextStyle(color: color, fontWeight: FontWeight.w700)),
-              Text('${c.speedMph} mph',
-                  style: Theme.of(context).textTheme.bodySmall),
-            ],
-          ),
+          const SizedBox(width: 8),
+          Text(_roadLabel(s, e.severity),
+              style: TextStyle(
+                  color: color, fontWeight: FontWeight.w700, fontSize: 12)),
         ],
       ),
     );

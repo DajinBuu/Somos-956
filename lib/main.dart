@@ -6,6 +6,7 @@ import 'tabs/community.dart';
 import 'tabs/education.dart';
 import 'tabs/health.dart';
 import 'tabs/home.dart';
+import 'tabs/onboarding.dart';
 import 'tabs/settings.dart';
 import 'tabs/transport.dart';
 import 'widgets/mascot.dart';
@@ -82,8 +83,25 @@ class Somos956App extends StatelessWidget {
             ),
           ),
         ),
-        home: const HomeShell(),
+        home: const RootGate(),
       ),
+    );
+  }
+}
+
+/// Shows the first-launch language chooser until the user has picked a mode,
+/// then the main app shell. Rebuilds automatically via [LocaleScope].
+class RootGate extends StatelessWidget {
+  const RootGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = LocaleScope.of(context);
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 260),
+      child: settings.onboarded
+          ? const HomeShell(key: ValueKey('shell'))
+          : OnboardingScreen(key: const ValueKey('onboarding'), settings: settings),
     );
   }
 }

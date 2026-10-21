@@ -76,7 +76,8 @@ class Bridge {
   final String city;
   final String cityEs;
   final String crossing;
-  final List<int> hourlyPattern; // 24 values, relative delay 0..10
+  final String portNumber; // CBP port_number used by the live BWT feed
+  final List<int> hourlyPattern; // 24 values, relative delay 0..10 (fallback)
   final double lat;
   final double lon;
   const Bridge({
@@ -86,6 +87,7 @@ class Bridge {
     required this.city,
     required this.cityEs,
     required this.crossing,
+    required this.portNumber,
     required this.hourlyPattern,
     required this.lat,
     required this.lon,
@@ -98,12 +100,20 @@ class BridgeReading {
   final BridgeState state;
   final DateTime updated;
   final bool live;
+  final int? passengerWait;
+  final int? commercialWait;
+  final int? pedestrianWait;
+  final String laneStatus;
   const BridgeReading({
     required this.bridge,
     required this.waitMinutes,
     required this.state,
     required this.updated,
     this.live = false,
+    this.passengerWait,
+    this.commercialWait,
+    this.pedestrianWait,
+    this.laneStatus = '',
   });
 }
 
@@ -111,6 +121,76 @@ class BridgeForecast {
   final int hour;
   final int wait;
   const BridgeForecast(this.hour, this.wait);
+}
+
+enum RoadSeverity { info, minor, major, closure }
+
+class RoadEvent {
+  final String id;
+  final String title;
+  final String description;
+  final String route;
+  final RoadSeverity severity;
+  final double lat;
+  final double lon;
+  const RoadEvent({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.route,
+    required this.severity,
+    required this.lat,
+    required this.lon,
+  });
+}
+
+class WeatherSnapshot {
+  final double temperatureF;
+  final double feelsLikeF;
+  final int humidity;
+  final double windMph;
+  final String condition;
+  final int weatherCode;
+  final double? heatIndexF;
+  final DateTime updated;
+  const WeatherSnapshot({
+    required this.temperatureF,
+    required this.feelsLikeF,
+    required this.humidity,
+    required this.windMph,
+    required this.condition,
+    required this.weatherCode,
+    required this.updated,
+    this.heatIndexF,
+  });
+}
+
+class AirQuality {
+  final int aqi;
+  final double pm25;
+  final double pm10;
+  final DateTime updated;
+  const AirQuality({
+    required this.aqi,
+    required this.pm25,
+    required this.pm10,
+    required this.updated,
+  });
+}
+
+class WeatherAlert {
+  final String event;
+  final String severity;
+  final String headline;
+  final String area;
+  final String description;
+  const WeatherAlert({
+    required this.event,
+    required this.severity,
+    required this.headline,
+    required this.area,
+    required this.description,
+  });
 }
 
 enum CorridorLevel { light, moderate, heavy, severe }

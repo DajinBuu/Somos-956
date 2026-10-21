@@ -119,10 +119,13 @@ class AiBadge extends StatelessWidget {
 
 class SectionCard extends StatelessWidget {
   final IconData icon;
+  /// Translation key (unless [rawTitle] is set).
   final String title;
+  final bool rawTitle;
   final Widget? trailing;
   final Widget child;
   final EdgeInsets padding;
+  /// Translation key for the subtitle.
   final String? subtitle;
 
   const SectionCard({
@@ -130,6 +133,7 @@ class SectionCard extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.child,
+    this.rawTitle = false,
     this.trailing,
     this.subtitle,
     this.padding = const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -138,6 +142,16 @@ class SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final s = S.of(context);
+    final titleWidget = rawTitle
+        ? Text(
+            title,
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w800),
+          )
+        : s.tk(title);
     return Card(
       child: Padding(
         padding: padding,
@@ -160,18 +174,11 @@ class SectionCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        title,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w800),
-                      ),
+                      titleWidget,
                       if (subtitle != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 2),
-                          child: Text(subtitle!,
-                              style: Theme.of(context).textTheme.bodySmall),
+                          child: s.tk(subtitle!, size: 12.5),
                         ),
                     ],
                   ),
