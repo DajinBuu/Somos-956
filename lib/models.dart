@@ -1,208 +1,236 @@
-class HeatReading {
-  final double tempF;
-  final double? humidity;
-  final double? heatIndexF;
-  final String condition;
-  final bool live;
-  final DateTime observed;
+enum CareType { hospital, urgent, clinic, pharmacy }
 
-  const HeatReading({
-    required this.tempF,
-    this.humidity,
-    this.heatIndexF,
-    required this.condition,
-    required this.live,
-    required this.observed,
-  });
-
-  double get hi => heatIndexF ?? tempF;
-}
-
-enum HeatLevel { normal, caution, extreme, danger }
-
-HeatLevel heatLevelFor(double hi) {
-  if (hi >= 125) return HeatLevel.danger;
-  if (hi >= 103) return HeatLevel.extreme;
-  if (hi >= 90) return HeatLevel.caution;
-  return HeatLevel.normal;
-}
-
-double heatIndexF(double tempF, double rh) {
-  var t = tempF;
-  for (var i = 0; i < 3; i++) {
-    final c = -42.379 +
-        2.04901523 * t +
-        10.14333127 * rh -
-        0.22475541 * t * rh -
-        0.00683783 * t * t -
-        0.05481717 * rh * rh +
-        0.00122874 * t * t * rh +
-        0.00085282 * t * rh * rh -
-        0.00000199 * t * t * rh * rh;
-    t = tempF + (c - tempF) * 0.35;
-  }
-  final hiC = -8.78469475556 +
-      1.61139411 * t +
-      2.33854883889 * rh -
-      0.14611605 * t * rh -
-      0.012308094 * t * t -
-      0.0164248277778 * rh * rh +
-      0.002211732 * t * t * rh +
-      0.00072546 * t * rh * rh -
-      0.000003582 * t * t * rh * rh;
-  return hiC * 9 / 5 + 32;
-}
-
-class NwsAlert {
-  final String event;
-  final String severity;
-  final String headline;
-  final String instruction;
-  final DateTime? ends;
-  final bool demo;
-
-  const NwsAlert({
-    required this.event,
-    required this.severity,
-    required this.headline,
-    required this.instruction,
-    this.ends,
-    this.demo = false,
-  });
-}
-
-enum SiteType { coolingCenter, splashPad, acBuilding }
-
-class Site {
+class CareFacility {
+  final String id;
   final String name;
+  final CareType type;
   final String address;
   final String city;
   final String phone;
-  final String hours;
-  final SiteType type;
+  final bool acceptsUninsured;
+  final bool bilingual;
+  final bool open24h;
   final double lat;
   final double lon;
+  final String servicesEn;
+  final String servicesEs;
 
-  const Site({
+  const CareFacility({
+    required this.id,
     required this.name,
+    required this.type,
     required this.address,
     required this.city,
     required this.phone,
-    required this.hours,
-    required this.type,
+    required this.acceptsUninsured,
+    required this.bilingual,
+    required this.open24h,
     required this.lat,
     required this.lon,
+    required this.servicesEn,
+    required this.servicesEs,
   });
 }
 
-class ReservoirReading {
+class FamilyMember {
   final String name;
-  final double percentFull;
-  final double elevationFt;
-  final bool live;
-  final DateTime updated;
-  final String conservationPoolFt;
-
-  const ReservoirReading({
+  final int age;
+  final String notes;
+  final List<Visit> visits;
+  const FamilyMember({
     required this.name,
-    required this.percentFull,
-    required this.elevationFt,
-    required this.live,
-    required this.updated,
-    required this.conservationPoolFt,
+    required this.age,
+    this.notes = '',
+    this.visits = const [],
   });
 }
 
-class WaterZone {
-  final int number;
-  final String nameEn;
-  final String nameEs;
-  final int stage;
-  final String daysEn;
-  final String daysEs;
-  final String hoursRuleEn;
-  final String hoursRuleEs;
-  final List<String> rulesEn;
-  final List<String> rulesEs;
-
-  const WaterZone({
-    required this.number,
-    required this.nameEn,
-    required this.nameEs,
-    required this.stage,
-    required this.daysEn,
-    required this.daysEs,
-    required this.hoursRuleEn,
-    required this.hoursRuleEs,
-    required this.rulesEn,
-    required this.rulesEs,
-  });
+class Visit {
+  final String reason;
+  final DateTime date;
+  const Visit({required this.reason, required this.date});
 }
 
-class WaterQualityReport {
-  final String published;
-  final double chlorine;
-  final double ph;
-  final double turbidity;
-  final bool coliformDetected;
-  final bool demo;
-
-  const WaterQualityReport({
-    required this.published,
-    required this.chlorine,
-    required this.ph,
-    required this.turbidity,
-    required this.coliformDetected,
-    this.demo = true,
-  });
+class MedicalTerm {
+  final String term;
+  final String plainEn;
+  final String plainEs;
+  final String category; // diagnosis | test | insurance | medication | form
+  const MedicalTerm(this.term, this.plainEn, this.plainEs, this.category);
 }
 
-enum BridgeState { open, delayed, heavy, closed }
+class FormField {
+  final String fieldEn;
+  final String fieldEs;
+  final String explainEn;
+  final String explainEs;
+  const FormField(this.fieldEn, this.fieldEs, this.explainEn, this.explainEs);
+}
 
-class BridgeStatus {
+enum BridgeState { moving, slow, heavy }
+
+class Bridge {
+  final String id;
   final String name;
   final String nameEs;
-  final int waitMinutes;
-  final BridgeState state;
-  final DateTime? updated;
-  final bool demo;
-
-  const BridgeStatus({
-    required this.name,
-    required this.nameEs,
-    required this.waitMinutes,
-    required this.state,
-    this.updated,
-    this.demo = true,
-  });
-}
-
-enum HazardType { flood, construction, accident, debris }
-
-class Hazard {
-  final String titleEn;
-  final String titleEs;
-  final String road;
-  final HazardType type;
-  final int severity;
+  final String city;
+  final String cityEs;
+  final String crossing;
+  final List<int> hourlyPattern; // 24 values, relative delay 0..10
   final double lat;
   final double lon;
-  final DateTime? updated;
-
-  const Hazard({
-    required this.titleEn,
-    required this.titleEs,
-    required this.road,
-    required this.type,
-    required this.severity,
+  const Bridge({
+    required this.id,
+    required this.name,
+    required this.nameEs,
+    required this.city,
+    required this.cityEs,
+    required this.crossing,
+    required this.hourlyPattern,
     required this.lat,
     required this.lon,
-    this.updated,
   });
 }
 
-class SafetyTip {
-  final String en;
-  final String es;
-  const SafetyTip(this.en, this.es);
+class BridgeReading {
+  final Bridge bridge;
+  final int waitMinutes;
+  final BridgeState state;
+  final DateTime updated;
+  final bool live;
+  const BridgeReading({
+    required this.bridge,
+    required this.waitMinutes,
+    required this.state,
+    required this.updated,
+    this.live = false,
+  });
+}
+
+class BridgeForecast {
+  final int hour;
+  final int wait;
+  const BridgeForecast(this.hour, this.wait);
+}
+
+enum CorridorLevel { light, moderate, heavy, severe }
+
+class Corridor {
+  final String id;
+  final String name;
+  final String nameEs;
+  final String segment;
+  final CorridorLevel level;
+  final int speedMph;
+  final double lat;
+  final double lon;
+  const Corridor({
+    required this.id,
+    required this.name,
+    required this.nameEs,
+    required this.segment,
+    required this.level,
+    required this.speedMph,
+    required this.lat,
+    required this.lon,
+  });
+}
+
+enum ResourceType { food, shelter, clinic, hotline, legal }
+
+class CommunityResource {
+  final String id;
+  final String name;
+  final ResourceType type;
+  final String address;
+  final String city;
+  final String phone;
+  final String hoursEn;
+  final String hoursEs;
+  final String detailEn;
+  final String detailEs;
+  final double lat;
+  final double lon;
+  const CommunityResource({
+    required this.id,
+    required this.name,
+    required this.type,
+    required this.address,
+    required this.city,
+    required this.phone,
+    required this.hoursEn,
+    required this.hoursEs,
+    required this.detailEn,
+    required this.detailEs,
+    required this.lat,
+    required this.lon,
+  });
+}
+
+class EligibilityProgram {
+  final String name;
+  final String nameEs;
+  final String descriptionEn;
+  final String descriptionEs;
+  final bool childRelated;
+  final bool elderlyRelated;
+  final bool uninsuredRelated;
+  final int incomeThresholdMonthly; // for household of 1, scaled up
+  const EligibilityProgram({
+    required this.name,
+    required this.nameEs,
+    required this.descriptionEn,
+    required this.descriptionEs,
+    this.childRelated = false,
+    this.elderlyRelated = false,
+    this.uninsuredRelated = false,
+    required this.incomeThresholdMonthly,
+  });
+}
+
+class CulturalTip {
+  final String titleEn;
+  final String titleEs;
+  final String bodyEn;
+  final String bodyEs;
+  const CulturalTip(this.titleEn, this.titleEs, this.bodyEn, this.bodyEs);
+}
+
+enum EduType { tutoring, library, afterschool, scholarship, college, esl }
+
+class EduResource {
+  final String id;
+  final String name;
+  final EduType type;
+  final String provider;
+  final String address;
+  final String city;
+  final String phone;
+  final String detailEn;
+  final String detailEs;
+  final String deadlineEn;
+  final String deadlineEs;
+  final String rewardEn;
+  final String rewardEs;
+  final bool free;
+  final double lat;
+  final double lon;
+  const EduResource({
+    required this.id,
+    required this.name,
+    required this.type,
+    required this.provider,
+    this.address = '',
+    this.city = '',
+    this.phone = '',
+    required this.detailEn,
+    required this.detailEs,
+    this.deadlineEn = '',
+    this.deadlineEs = '',
+    this.rewardEn = '',
+    this.rewardEs = '',
+    this.free = true,
+    this.lat = 0,
+    this.lon = 0,
+  });
 }

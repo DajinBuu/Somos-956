@@ -10,9 +10,9 @@ class Notifier {
 
   static const _details = NotificationDetails(
     android: AndroidNotificationDetails(
-      'rgv_ready_alerts',
-      'RGV Ready Alerts',
-      channelDescription: 'Heat, watering restrictions and hydration reminders',
+      'somos_956',
+      'Somos 956',
+      channelDescription: 'Appointment reminders and community alerts',
       importance: Importance.high,
       priority: Priority.high,
       styleInformation: BigTextStyleInformation(''),
@@ -28,14 +28,14 @@ class Notifier {
       iOS: DarwinInitializationSettings(),
       macOS: DarwinInitializationSettings(),
     );
-    await _plugin.initialize(settings: settings);
     try {
+      await _plugin.initialize(settings: settings);
       final android = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
       await android?.createNotificationChannel(const AndroidNotificationChannel(
-        'rgv_ready_alerts',
-        'RGV Ready Alerts',
-        description: 'Heat, watering restrictions and hydration reminders',
+        'somos_956',
+        'Somos 956',
+        description: 'Appointment reminders and community alerts',
         importance: Importance.max,
       ));
       await android?.requestNotificationsPermission();
@@ -51,33 +51,44 @@ class Notifier {
 
   static Future<void> showNow(String title, String body, {int id = 1}) async {
     try {
-      await _plugin.show(id: id, title: title, body: body, notificationDetails: _details);
+      await _plugin.show(
+          id: id, title: title, body: body, notificationDetails: _details);
     } catch (_) {}
   }
 
-  static Future<DateTime?> scheduleHydration(
-      int minutes, String title, String body) async {
+  /// Schedule a reminder [minutesBefore] ahead of [when], defaulting to one day
+  /// before an appointment if that window has passed.
+  static Future<DateTime?> scheduleVisitReminder(
+    int id,
+    DateTime when,
+    String title,
+    String body, {
+    int minutesBefore = 1440,
+  }) async {
     try {
       await init();
-      final when = tz.TZDateTime.now(tz.local).add(Duration(minutes: minutes));
+      var fireAt = when.subtract(Duration(minutes: minutesBefore));
+      if (fireAt.isBefore(DateTime.now())) {
+        fireAt = DateTime.now().add(const Duration(minutes: 5));
+      }
+      final tzWhen = tz.TZDateTime.from(fireAt, tz.local);
       await _plugin.zonedSchedule(
-        id: 100,
+        id: id,
         title: title,
         body: body,
-        scheduledDate: when,
+        scheduledDate: tzWhen,
         notificationDetails: _details,
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        payload: 'hydration:$minutes',
       );
-      return when.toLocal();
+      return fireAt;
     } catch (_) {
       return null;
     }
   }
 
-  static Future<void> cancelHydration() async {
+  static Future<void> cancel(int id) async {
     try {
-      await _plugin.cancel(id: 100);
+      await _plugin.cancel(id: id);
     } catch (_) {}
   }
 

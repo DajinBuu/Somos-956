@@ -1,11 +1,11 @@
 {
-    "name": "rgv_ready",
-    "short_name": "rgv_ready",
+    "name": "Somos 956",
+    "short_name": "Somos 956",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#7C2D12",
+    "theme_color": "#C2410C",
+    "description": "A bilingual community app for the Rio Grande Valley: healthcare, border & highway times, local resources, and education support.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

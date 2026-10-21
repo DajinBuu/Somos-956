@@ -3,37 +3,28 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../l10n.dart';
-import '../models.dart';
 
-Color heatColor(HeatLevel level) {
-  switch (level) {
-    case HeatLevel.normal:
-      return const Color(0xFF2E7D32);
-    case HeatLevel.caution:
-      return const Color(0xFFF9A825);
-    case HeatLevel.extreme:
-      return const Color(0xFFEF6C00);
-    case HeatLevel.danger:
-      return const Color(0xFFC62828);
-  }
-}
-
-Color severityColor(int severity) {
-  switch (severity) {
-    case 3:
-      return const Color(0xFFC62828);
+Color healthCareColor(int type) {
+  switch (type) {
+    case 0:
+      return const Color(0xFFC62828); // hospital
+    case 1:
+      return const Color(0xFFEF6C00); // urgent
     case 2:
-      return const Color(0xFFEF6C00);
+      return const Color(0xFF0E7490); // clinic
     default:
-      return const Color(0xFFF9A825);
+      return const Color(0xFF6A1B9A); // pharmacy
   }
 }
 
-String severityLabel(BuildContext context, int severity) {
-  final s = S.of(context);
-  if (severity >= 3) return s.t('severity_closed');
-  if (severity == 2) return s.t('severity_high');
-  return s.t('severity_medium');
+Color levelColor(int index) {
+  const c = [
+    Color(0xFF2E7D32),
+    Color(0xFFF9A825),
+    Color(0xFFEF6C00),
+    Color(0xFFC62828),
+  ];
+  return c[index.clamp(0, 3)];
 }
 
 String fmtTime(DateTime t) {
@@ -42,9 +33,23 @@ String fmtTime(DateTime t) {
   return '$h:$m ${t.hour < 12 ? 'AM' : 'PM'}';
 }
 
+String fmtDate(DateTime t, bool es) {
+  const en = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ];
+  const sp = [
+    'ene', 'feb', 'mar', 'abr', 'may', 'jun',
+    'jul', 'ago', 'sep', 'oct', 'nov', 'dic'
+  ];
+  final m = (es ? sp : en)[t.month - 1];
+  return '$m ${t.day}, ${t.year}';
+}
+
 class LiveBadge extends StatelessWidget {
   final bool live;
-  const LiveBadge({super.key, required this.live});
+  final String? label;
+  const LiveBadge({super.key, required this.live, this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -52,24 +57,58 @@ class LiveBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: (live ? Colors.green : Colors.blueGrey).withValues(alpha: 0.15),
+        color: (live ? Colors.green : Colors.blueGrey).withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-            color: live ? Colors.green.shade700 : Colors.blueGrey.shade700, width: 0.8),
+            color: live ? Colors.green.shade700 : Colors.blueGrey.shade700,
+            width: 0.8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(live ? Icons.cell_tower : Icons.science_outlined,
-              size: 12, color: live ? Colors.green.shade800 : Colors.blueGrey.shade800),
+              size: 12,
+              color: live ? Colors.green.shade800 : Colors.blueGrey.shade800),
           const SizedBox(width: 4),
           Text(
-            live ? s.t('live') : s.t('demo'),
+            label ?? (live ? s.t('live') : s.t('demo')),
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
               color: live ? Colors.green.shade800 : Colors.blueGrey.shade800,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class AiBadge extends StatelessWidget {
+  final String? label;
+  const AiBadge({super.key, this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xFF6A1B9A).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF6A1B9A), width: 0.8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.auto_awesome, size: 12, color: Color(0xFF6A1B9A)),
+          const SizedBox(width: 4),
+          Text(
+            label ?? s.t('predicted'),
+            style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF6A1B9A)),
           ),
         ],
       ),
@@ -83,6 +122,7 @@ class SectionCard extends StatelessWidget {
   final Widget? trailing;
   final Widget child;
   final EdgeInsets padding;
+  final String? subtitle;
 
   const SectionCard({
     super.key,
@@ -90,6 +130,7 @@ class SectionCard extends StatelessWidget {
     required this.title,
     required this.child,
     this.trailing,
+    this.subtitle,
     this.padding = const EdgeInsets.fromLTRB(16, 12, 16, 16),
   });
 
@@ -106,15 +147,23 @@ class SectionCard extends StatelessWidget {
                 Icon(icon, color: Theme.of(context).colorScheme.primary, size: 22),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w700),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      if (subtitle != null)
+                        Text(subtitle!,
+                            style: Theme.of(context).textTheme.bodySmall),
+                    ],
                   ),
                 ),
-                if (trailing case final trailing?) trailing,
+                ?trailing,
               ],
             ),
             const SizedBox(height: 10),
@@ -150,9 +199,9 @@ class MapPane extends StatelessWidget {
   const MapPane({
     super.key,
     required this.markers,
-    this.center = const LatLng(25.9017, -97.4975),
-    this.zoom = 11.2,
-    this.height = 300,
+    this.center = const LatLng(kValleyCenterLat, kValleyCenterLon),
+    this.zoom = 9.4,
+    this.height = 320,
   });
 
   @override
@@ -162,35 +211,35 @@ class MapPane extends StatelessWidget {
       child: SizedBox(
         height: height,
         child: FlutterMap(
-          options: MapOptions(
-            initialCenter: center,
-            initialZoom: zoom,
-          ),
+          options: MapOptions(initialCenter: center, initialZoom: zoom),
           children: [
             TileLayer(
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'org.rgvready.rgv_ready',
+              userAgentPackageName: 'org.somos956.somos_956',
             ),
             MarkerLayer(
               markers: [
                 for (final m in markers)
                   Marker(
                     point: m.point,
-                    width: 38,
-                    height: 38,
+                    width: 34,
+                    height: 34,
                     alignment: Alignment.topCenter,
                     child: GestureDetector(
                       onTap: m.onTap,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: m.color,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                          boxShadow: const [
-                            BoxShadow(color: Colors.black26, blurRadius: 4),
-                          ],
+                      child: Tooltip(
+                        message: m.label,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: m.color,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                            boxShadow: const [
+                              BoxShadow(color: Colors.black26, blurRadius: 4),
+                            ],
+                          ),
+                          child: Icon(m.icon, color: Colors.white, size: 18),
                         ),
-                        child: Icon(m.icon, color: Colors.white, size: 20),
                       ),
                     ),
                   ),
@@ -203,48 +252,33 @@ class MapPane extends StatelessWidget {
   }
 }
 
-class StageBadge extends StatelessWidget {
-  final int stage;
-  const StageBadge({super.key, required this.stage});
+const kValleyCenterLat = 26.2034;
+const kValleyCenterLon = -98.2300;
+
+class InfoTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const InfoTile({super.key, required this.icon, required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
-    final s = S.of(context);
-    final (label, color) = switch (stage) {
-      0 => (s.t('stage_none'), Colors.green.shade700),
-      1 => (s.t('stage1'), Colors.yellow.shade800),
-      2 => (s.t('stage2'), Colors.orange.shade800),
-      3 => (s.t('stage3'), const Color(0xFFC2410C)),
-      _ => (s.t('stage4'), Colors.red.shade800),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        border: Border.all(color: color, width: 1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(label,
-          style: TextStyle(
-              color: color, fontWeight: FontWeight.w700, fontSize: 12.5)),
-    );
-  }
-}
-
-class PercentBar extends StatelessWidget {
-  final double percent;
-  final Color color;
-  const PercentBar({super.key, required this.percent, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: LinearProgressIndicator(
-        value: (percent / 100).clamp(0, 1),
-        minHeight: 10,
-        backgroundColor: color.withValues(alpha: 0.15),
-        valueColor: AlwaysStoppedAnimation(color),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 17, color: Theme.of(context).colorScheme.secondary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text.rich(TextSpan(children: [
+              TextSpan(
+                  text: '$label: ',
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              TextSpan(text: value),
+            ])),
+          ),
+        ],
       ),
     );
   }

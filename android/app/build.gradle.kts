@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "org.rgvready.rgv_ready"
+    namespace = "org.somos956.somos_956"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -17,7 +17,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "org.rgvready.rgv_ready"
+        applicationId = "org.somos956.somos_956"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = Math.max(flutter.minSdkVersion, 23)

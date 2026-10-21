@@ -1,80 +1,78 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:rgv_ready/l10n.dart';
-import 'package:rgv_ready/local_data.dart';
-import 'package:rgv_ready/main.dart';
-import 'package:rgv_ready/models.dart';
-import 'package:rgv_ready/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:somos_956/l10n.dart';
+import 'package:somos_956/local_data.dart';
+import 'package:somos_956/main.dart';
+import 'package:somos_956/models.dart';
+import 'package:somos_956/services.dart';
 
 void main() {
-  testWidgets('app builds with dashboard', (tester) async {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('bilingual table returns English and Spanish', () {
+    const en = S('en');
+    const es = S('es');
+    expect(en.t('app_title'), 'Somos 956');
+    expect(en.t('nav_health'), 'Health');
+    expect(es.t('nav_health'), 'Salud');
+    expect(en.pick('Hello', 'Hola'), 'Hello');
+    expect(es.pick('Hello', 'Hola'), 'Hola');
+  });
+
+  test('seed data is populated', () {
+    expect(kCareFacilities, isNotEmpty);
+    expect(kMedicalTerms, isNotEmpty);
+    expect(kBridges, isNotEmpty);
+    expect(kCorridors, isNotEmpty);
+    expect(kCommunityResources, isNotEmpty);
+    expect(kEligibilityPrograms, isNotEmpty);
+    expect(kCulturalTips, isNotEmpty);
+    expect(kEduResources, isNotEmpty);
+  });
+
+  test('bridge wait model returns a bounded value', () {
+    final bridge = kBridges.first;
+    final wait = BorderService.predictWait(bridge, DateTime(2026, 5, 1, 8));
+    expect(wait, inInclusiveRange(3, 90));
+    expect(BorderService.stateFor(wait), isA<BridgeState>());
+
+    final forecast = BorderService.forecast(bridge, DateTime(2026, 5, 1, 8));
+    expect(forecast, isNotEmpty);
+  });
+
+  test('term decoder finds a known term', () {
+    final decoder = TermDecoder();
+    final hit = decoder.lookup('hypertension');
+    expect(hit, isNotNull);
+    expect(hit!.term.toLowerCase(), contains('hypertension'));
+  });
+
+  testWidgets('app shell renders all navigation tabs', (tester) async {
+    SharedPreferences.setMockInitialValues({});
     final settings = AppSettings();
     await settings.load();
-    tester.view.physicalSize = const Size(1080, 1920);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-    await tester.pumpWidget(RgvReadyApp(settings: settings));
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('RGV Ready'), findsOneWidget);
-    expect(find.text('Home'), findsOneWidget);
-    expect(find.text('Heat'), findsOneWidget);
-    expect(find.text('Water'), findsOneWidget);
-    expect(find.text('Traffic'), findsOneWidget);
+    await tester.pumpWidget(Somos956App(settings: settings));
+    await tester.pump();
+
+    expect(find.text('Somos 956'), findsWidgets);
+    expect(find.text('Health'), findsWidgets);
+    expect(find.text('Transport'), findsWidgets);
+    expect(find.text('Community'), findsWidgets);
+    expect(find.text('Education'), findsWidgets);
   });
 
-  test('heat index thresholds', () {
-    expect(heatLevelFor(85), HeatLevel.normal);
-    expect(heatLevelFor(95), HeatLevel.caution);
-    expect(heatLevelFor(110), HeatLevel.extreme);
-    expect(heatLevelFor(130), HeatLevel.danger);
-    final hi = heatIndexF(100, 50);
-    expect(hi, greaterThan(100));
-  });
+  testWidgets('language toggle switches labels', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final settings = AppSettings();
+    await settings.load();
+    await tester.pumpWidget(Somos956App(settings: settings));
+    await tester.pump();
 
-  test('bilingual strings exist in both languages', () {
-    final keys = {
-      'app_title',
-      'nav_heat',
-      'nav_water',
-      'nav_traffic',
-      'stage2',
-      'worker_tips',
-      'bridge_delays',
-      'hydration_reminders',
-      'flood_prone',
-    };
-    for (final k in keys) {
-      final en = const S('en').t(k);
-      final es = const S('es').t(k);
-      expect(en, isNotEmpty);
-      expect(es, isNotEmpty);
-      expect(en == k, isFalse, reason: 'missing EN translation for $k');
-      expect(es == k, isFalse, reason: 'missing ES translation for $k');
-    }
-  });
+    await tester.tap(find.text('ES'));
+    await tester.pumpAndSettle();
 
-  test('local data sanity', () {
-    expect(kSites.length, greaterThanOrEqualTo(20));
-    expect(kZones.length, 6);
-    expect(kBridges.length, greaterThanOrEqualTo(3));
-    expect(kHazards.length, greaterThanOrEqualTo(5));
-    expect(kWorkerTips.length, greaterThanOrEqualTo(8));
-    for (final site in kSites) {
-      expect(site.lat, inInclusiveRange(25.5, 26.5));
-      expect(site.lon, inInclusiveRange(-98.5, -97.0));
-    }
-    for (final zone in kZones) {
-      expect(zone.stage, inInclusiveRange(0, 4));
-      expect(zone.rulesEs.length, zone.rulesEn.length);
-    }
-  });
-
-  test('reservoir fallback returns both lakes', () async {
-    final readings = await ReservoirService().fetch();
-    expect(readings.length, 2);
-    for (final r in readings) {
-      expect(r.percentFull, inInclusiveRange(0, 100));
-      expect(r.name, contains('Reservoir'));
-    }
+    expect(find.text('Salud'), findsWidgets);
+    expect(find.text('Ajustes'), findsWidgets);
   });
 }
