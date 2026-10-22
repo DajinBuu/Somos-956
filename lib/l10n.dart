@@ -517,6 +517,8 @@ class S {
     'today_forecast': {'en': 'Today', 'es': 'Hoy'},
     'road_closures': {'en': 'Road conditions & closures', 'es': 'Condiciones y cierres de carreteras'},
     'no_closures': {'en': 'No reported closures right now', 'es': 'Sin cierres reportados ahora'},
+    'loading': {'en': 'Loading…', 'es': 'Cargando…'},
+    'none_active': {'en': 'None active', 'es': 'Ninguno activo'},
     'live_now': {'en': 'Live now', 'es': 'En vivo ahora'},
     'refreshing': {'en': 'Refreshing…', 'es': 'Actualizando…'},
     'try_again': {'en': 'Try again', 'es': 'Reintentar'},

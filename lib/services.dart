@@ -431,12 +431,14 @@ class RoadService {
         '$_base?where=1%3D1&geometry=${Uri.encodeComponent(geom)}'
         '&geometryType=esriGeometryEnvelope&inSR=4326'
         '&spatialRel=esriSpatialRelIntersects'
-        '&outFields=condition%2Croute_name%2Cfrom_limit%2Cto_limit%2C'
-        'description%2Ccounty_num&returnGeometry=true&outSR=4326&f=json'
+        '&outFields=condition%2Croute_name%2Croadway%2Cfrom_limit%2Cto_limit%2C'
+        'description%2Cdelay_flag%2Cdetour_flag%2Ccounty_num'
+        '&returnGeometry=true&outSR=4326&f=json'
         '&resultRecordCount=200',
       );
-      final res =
-          await _client.get(uri, headers: _headers()).timeout(const Duration(seconds: 12));
+      final res = await _client
+          .get(uri, headers: _headers())
+          .timeout(const Duration(seconds: 12));
       if (res.statusCode != 200) return const [];
       final body = jsonDecode(res.body) as Map<String, dynamic>;
       final features = body['features'] as List? ?? const [];
@@ -445,41 +447,105 @@ class RoadService {
         final m = f as Map;
         final attrs = m['attributes'] as Map<String, dynamic>?;
         if (attrs == null) continue;
-        final cond = '${attrs['condition'] ?? ''}'.toLowerCase();
-        final desc = '${attrs['description'] ?? ''}';
+        final condition = '${attrs['condition'] ?? ''}'.trim();
+        if (condition.isEmpty) continue;
+
+        final route = '${attrs['route_name'] ?? ''}'.trim();
+        final roadway = '${attrs['roadway'] ?? ''}'.trim();
+        final from = '${attrs['from_limit'] ?? ''}'.trim();
+        final to = '${attrs['to_limit'] ?? ''}'.trim();
+        final delay = '${attrs['delay_flag'] ?? ''}'.toLowerCase() == 'true';
+        final detour = '${attrs['detour_flag'] ?? ''}'.toLowerCase() == 'true';
+
         final g = m['geometry'] as Map<String, dynamic>?;
         final lat = _parseDouble(g?['y']) ?? _parseDouble(g?['latitude']) ?? 0;
         final lon = _parseDouble(g?['x']) ?? _parseDouble(g?['longitude']) ?? 0;
+
         out.add(RoadEvent(
-          id: 'cd-${out.length}-${attrs['route_name']}',
-          title: '${attrs['condition'] ?? 'Condition'}'.trim(),
-          description: desc.trim().isEmpty
-              ? '${attrs['from_limit'] ?? ''} → ${attrs['to_limit'] ?? ''}'
-              : desc.trim(),
-          route: '${attrs['route_name'] ?? ''}'.trim(),
-          severity: _severityFor(cond),
+          id: 'cd-${attrs['OBJECTID'] ?? out.length}',
+          title: condition,
+          description: _roadDescription(
+            description: '${attrs['description'] ?? ''}',
+            roadway: roadway,
+            from: from,
+            to: to,
+            route: route,
+            delay: delay,
+            detour: detour,
+          ),
+          route: route,
+          severity: _severityFor(condition.toLowerCase()),
           lat: lat,
           lon: lon,
         ));
       }
+      // Most disruptive first, then by route for a stable order.
+      out.sort((a, b) {
+        final s = b.severity.index.compareTo(a.severity.index);
+        if (s != 0) return s;
+        return a.route.compareTo(b.route);
+      });
       return out;
     } catch (_) {
       return const [];
     }
   }
 
-  static RoadSeverity _severityFor(String condition) {
-    if (condition.contains('clos') || condition.contains('closed')) {
-      return RoadSeverity.closure;
+  /// Builds a clean, human-readable description: strips the `<br/>` HTML the
+  /// feed embeds and appends the real roadway / from–to limits and flags.
+  static String _roadDescription({
+    required String description,
+    required String roadway,
+    required String from,
+    required String to,
+    required String route,
+    required bool delay,
+    required bool detour,
+  }) {
+    final parts = <String>[];
+    final cleaned = description
+        .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'<[^>]+>'), '')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll(RegExp(r'[ \t]+'), ' ')
+        .split('\n')
+        .map((l) => l.replaceAll(RegExp(r'^[\s\-•]+'), '').trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+    parts.addAll(cleaned);
+
+    if (from.isNotEmpty || to.isNotEmpty) {
+      final where = roadway.isNotEmpty ? '$roadway ($route)' : route;
+      if (from.isNotEmpty && to.isNotEmpty && from != to) {
+        parts.add('From $from to $to${where.isEmpty ? '' : ' · $where'}');
+      } else {
+        final loc = from.isNotEmpty ? from : to;
+        parts.add('$loc${where.isEmpty ? '' : ' · $where'}');
+      }
+    } else if (roadway.isNotEmpty) {
+      parts.add('$roadway${route.isEmpty ? '' : ' ($route)'}');
     }
+
+    if (detour) parts.add('Detour available');
+    if (delay) parts.add('Expect delays');
+    return parts.join('\n');
+  }
+
+  static RoadSeverity _severityFor(String condition) {
+    if (condition.contains('clos')) return RoadSeverity.closure;
     if (condition.contains('construction') ||
         condition.contains('road work') ||
-        condition.contains('maintenance')) {
+        condition.contains('maintenance') ||
+        condition.contains('detour')) {
       return RoadSeverity.major;
     }
     if (condition.contains('ice') ||
+        condition.contains('snow') ||
         condition.contains('flood') ||
-        condition.contains('water')) {
+        condition.contains('water') ||
+        condition.contains('high wind') ||
+        condition.contains('fog')) {
       return RoadSeverity.minor;
     }
     return RoadSeverity.info;

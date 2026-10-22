@@ -362,13 +362,18 @@ class _TransportTabState extends State<TransportTab> {
             title: 'road_closures',
             trailing: FutureBuilder<List<RoadEvent>>(
               future: _closures,
-              builder: (context, snap) => LiveBadge(
-                live: snap.connectionState == ConnectionState.done &&
-                    (snap.data?.isNotEmpty ?? false),
-                label: snap.data?.isEmpty ?? true
-                    ? s.t('data_live')
-                    : s.t('data_live'),
-              ),
+              builder: (context, snap) {
+                final done = snap.connectionState == ConnectionState.done;
+                final events = snap.data ?? const <RoadEvent>[];
+                return LiveBadge(
+                  live: done && events.isNotEmpty,
+                  label: !done
+                      ? s.t('loading')
+                      : (events.isEmpty
+                          ? s.t('none_active')
+                          : s.t('data_live')),
+                );
+              },
             ),
             child: FutureBuilder<List<RoadEvent>>(
               future: _closures,
@@ -781,6 +786,8 @@ class _TransportTabState extends State<TransportTab> {
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(e.description,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall),
                   ),
               ],

@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:somos_956/l10n.dart';
@@ -96,6 +98,35 @@ void main() {
     final (hour, wait) = BorderService.peakHourForDay(b, DateTime.friday);
     expect(hour, inInclusiveRange(0, 23));
     expect(wait, inInclusiveRange(2, 120));
+  });
+
+  test('road service strips HTML and maps severity', () async {
+    final client = MockClient((req) async {
+      return http.Response(
+        '{"features":[{"attributes":{"OBJECTID":56,"condition":"Construction",'
+        '"route_name":"FM0676","roadway":"","from_limit":"1040 Feet W of FM2220",'
+        '"to_limit":"0 Feet W of FM2220",'
+        '"description":"- Alternating lanes closed.<br/>- Expect delays.<br/>",'
+        '"delay_flag":"True","detour_flag":"False"},"geometry":{"x":-98.1,"y":26.3}},'
+        '{"attributes":{"OBJECTID":99,"condition":"Closure","route_name":"US0083",'
+        '"roadway":"","from_limit":"","to_limit":"",'
+        '"description":"Road closed<br/>","delay_flag":"False","detour_flag":"True"},'
+        '"geometry":{"x":-97.8,"y":26.1}}]}',
+        200,
+      );
+    });
+    final svc = RoadService(client: client);
+    final events = await svc.closures();
+    expect(events.length, 2);
+    // Closure sorts first.
+    expect(events.first.severity, RoadSeverity.closure);
+    expect(events.first.route, 'US0083');
+    // HTML tags are stripped from the description.
+    final con = events.firstWhere((e) => e.route == 'FM0676');
+    expect(con.description.contains('<br'), isFalse);
+    expect(con.description.toLowerCase(), contains('alternating lanes closed'));
+    expect(con.description.contains('FM0676'), isTrue);
+    expect(con.severity, RoadSeverity.major);
   });
 
   test('manual location overrides distance reference', () {
