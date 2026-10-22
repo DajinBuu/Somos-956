@@ -28,6 +28,7 @@ class _TransportTabState extends State<TransportTab> {
 
   Bridge? _etaBridge;
   int _etaHour = DateTime.now().hour;
+  int _etaWeekday = DateTime.now().weekday;
 
   @override
   void initState() {
@@ -270,10 +271,36 @@ class _TransportTabState extends State<TransportTab> {
                   }),
                 ),
                 const SizedBox(height: 10),
+                Text(s.t('eta_day'),
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final d in const [1, 2, 3, 4, 5, 6, 7])
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: ChoiceChip(
+                            label: Text(_dayLabel(s, d),
+                                style: const TextStyle(fontSize: 12.5)),
+                            selected: _etaWeekday == d,
+                            onSelected: (_) =>
+                                setState(() => _etaWeekday = d),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
-                      child: Text('${s.t('eta_when')}: ${_hourLabel(_etaHour)}'),
+                      child: Text(
+                          '${s.t('eta_when')}: ${_hourLabel(_etaHour)}'),
                     ),
                   ],
                 ),
@@ -285,7 +312,7 @@ class _TransportTabState extends State<TransportTab> {
                   label: _hourLabel(_etaHour),
                   onChanged: (v) => setState(() => _etaHour = v.round()),
                 ),
-                if (_etaBridge != null)
+                if (_etaBridge != null) ...[
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(14),
@@ -297,11 +324,13 @@ class _TransportTabState extends State<TransportTab> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.auto_awesome, color: Color(0xFF6A1B9A)),
+                        const Icon(Icons.auto_awesome,
+                            color: Color(0xFF6A1B9A)),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            '${s.t('eta_result')}: ${BorderService.predictWait(_etaBridge!, DateTime(2026, 1, 1, _etaHour))} ${s.t('min')}',
+                            '${s.t('eta_result')} · ${_dayLabel(s, _etaWeekday)} ${_hourLabel(_etaHour)}: '
+                            '${BorderService.predictWaitForDay(_etaBridge!, _etaWeekday, _etaHour)} ${s.t('min')}',
                             style: const TextStyle(
                                 fontWeight: FontWeight.w700,
                                 color: Color(0xFF6A1B9A)),
@@ -310,6 +339,21 @@ class _TransportTabState extends State<TransportTab> {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  _dayPatternBars(context, s, _etaBridge!),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.history,
+                          size: 15, color: Color(0xFF6A1B9A)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(s.t('eta_historical'),
+                            style: Theme.of(context).textTheme.bodySmall),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -547,6 +591,95 @@ class _TransportTabState extends State<TransportTab> {
               style: TextStyle(fontSize: 11.5, color: color, fontWeight: FontWeight.w600)),
         ],
       ),
+    );
+  }
+
+  String _dayLabel(S s, int weekday) {
+    const keys = [
+      'day_sun', 'day_mon', 'day_tue', 'day_wed',
+      'day_thu', 'day_fri', 'day_sat',
+    ];
+    return s.t(keys[(weekday - 1) % 7]);
+  }
+
+  /// Shows the average wait per weekday and highlights the busiest and lightest
+  /// days, so users can see which days run longer before they pick one.
+  Widget _dayPatternBars(BuildContext context, S s, Bridge b) {
+    final avgs = BorderService.dailyAverages(b);
+    final maxAvg = avgs.reduce((a, c) => c > a ? c : a);
+    var busiest = 1;
+    var lightest = 1;
+    for (var d = 1; d <= 7; d++) {
+      if (avgs[(d - 1) % 7] > avgs[(busiest - 1) % 7]) busiest = d;
+      if (avgs[(d - 1) % 7] < avgs[(lightest - 1) % 7]) lightest = d;
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: 74,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              for (final d in const [1, 2, 3, 4, 5, 6, 7])
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _etaWeekday = d),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text('${avgs[(d - 1) % 7]}',
+                            style: const TextStyle(
+                                fontSize: 9, color: Colors.black54)),
+                        const SizedBox(height: 2),
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          height: 40 * (avgs[(d - 1) % 7] / maxAvg) + 5,
+                          decoration: BoxDecoration(
+                            color: _etaWeekday == d
+                                ? const Color(0xFF6A1B9A)
+                                : levelColor(avgs[(d - 1) % 7] >= 35
+                                    ? 3
+                                    : avgs[(d - 1) % 7] >= 20
+                                        ? 2
+                                        : avgs[(d - 1) % 7] >= 12
+                                            ? 1
+                                            : 0),
+                            borderRadius: BorderRadius.circular(4),
+                            border: _etaWeekday == d
+                                ? Border.all(
+                                    color: const Color(0xFF4A148C), width: 1.5)
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(_dayLabel(s, d),
+                            style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: _etaWeekday == d
+                                    ? FontWeight.w800
+                                    : FontWeight.w400)),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 12,
+          runSpacing: 2,
+          children: [
+            Text('${s.t('busiest_day')}: ${_dayLabel(s, busiest)}',
+                style: const TextStyle(
+                    fontSize: 11.5, color: Color(0xFFC62828))),
+            Text('${s.t('lightest_day')}: ${_dayLabel(s, lightest)}',
+                style: const TextStyle(
+                    fontSize: 11.5, color: Color(0xFF2E7D32))),
+          ],
+        ),
+      ],
     );
   }
 

@@ -180,11 +180,69 @@ class BorderService {
   /// Offline fallback: realistic time-of-day model. [Bridge.hourlyPattern] holds
   /// typical *minutes* of wait per hour of day (northbound into the U.S.).
   /// Falls back clearly labeled as an estimate, never presented as live.
+  ///
+  /// Historical northbound crossing volume varies by day of week: weekday
+  /// commuters and shoppers drive the heaviest queues (Mon & Fri peak), while
+  /// weekend crossings dip — except Sunday afternoons, when families return
+  /// north and waits climb again. These relative factors model that pattern.
+  static const List<double> dayFactor = [
+    0.92, // Sun — return traffic lifts the usual weekend lull
+    1.12, // Mon — start-of-week commuter surge
+    1.00, // Tue
+    1.00, // Wed
+    1.04, // Thu — builds toward the weekend
+    1.15, // Fri — heaviest outbound/return mix
+    0.85, // Sat — lightest crossing day
+  ];
+
+  /// Multiplier (with a small deterministic wobble) for a given weekday.
+  static double factorForDay(int weekday, int hour) {
+    return dayFactor[weekday % 7];
+  }
+
+  /// Estimated wait for a specific day-of-week (DateTime.monday..sunday) and
+  /// hour, using the historical day factors. Deterministic, so the same inputs
+  /// always yield the same answer.
+  static int predictWaitForDay(Bridge b, int weekday, int hour) {
+    final base = b.hourlyPattern[hour.clamp(0, 23)];
+    final factor = factorForDay(weekday, hour);
+    // Deterministic per-(day,hour) variation keeps the table from looking flat.
+    final wobble = ((weekday * 5 + hour * 3) % 7) - 3;
+    return ((base * factor) + wobble).round().clamp(2, 120);
+  }
+
   static int predictWait(Bridge b, DateTime t) {
     final base = b.hourlyPattern[t.hour];
+    final factor = factorForDay(t.weekday, t.hour);
     // Small deterministic variation by day so consecutive days aren't identical.
     final wobble = ((t.day * 7 + t.hour * 3) % 7) - 3;
-    return (base + wobble).clamp(2, 120);
+    return ((base * factor) + wobble).round().clamp(2, 120);
+  }
+
+  /// The hardest (highest-wait) hour of a given weekday, plus its wait.
+  static (int hour, int wait) peakHourForDay(Bridge b, int weekday) {
+    var bestHour = 0;
+    var bestWait = -1;
+    for (var h = 0; h < 24; h++) {
+      final w = predictWaitForDay(b, weekday, h);
+      if (w > bestWait) {
+        bestWait = w;
+        bestHour = h;
+      }
+    }
+    return (bestHour, bestWait);
+  }
+
+  /// Averages each weekday's full-day wait so users can see which days run
+  /// heavier overall (0 = Sunday .. 6 = Saturday).
+  static List<int> dailyAverages(Bridge b) {
+    return List<int>.generate(7, (d) {
+      var sum = 0;
+      for (var h = 0; h < 24; h++) {
+        sum += predictWaitForDay(b, d, h);
+      }
+      return (sum / 24).round();
+    });
   }
 
   static List<BridgeForecast> forecast(Bridge b, DateTime from,

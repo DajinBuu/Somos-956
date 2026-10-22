@@ -75,6 +75,29 @@ void main() {
     expect(kBridges.any((b) => b.city == 'Roma'), isTrue);
   });
 
+  test('day-of-week model makes Fri/Mon heavier than Sat', () {
+    final b = kBridges.first;
+    final fri = BorderService.predictWaitForDay(b, DateTime.friday, 8);
+    final mon = BorderService.predictWaitForDay(b, DateTime.monday, 8);
+    final sat = BorderService.predictWaitForDay(b, DateTime.saturday, 8);
+    expect(fri, greaterThan(sat));
+    expect(mon, greaterThan(sat));
+    // Deterministic: same inputs give the same answer.
+    expect(BorderService.predictWaitForDay(b, DateTime.friday, 8), fri);
+  });
+
+  test('dailyAverages and peakHourForDay are well formed', () {
+    final b = kBridges.first;
+    final avgs = BorderService.dailyAverages(b);
+    expect(avgs.length, 7);
+    for (final a in avgs) {
+      expect(a, inInclusiveRange(2, 120));
+    }
+    final (hour, wait) = BorderService.peakHourForDay(b, DateTime.friday);
+    expect(hour, inInclusiveRange(0, 23));
+    expect(wait, inInclusiveRange(2, 120));
+  });
+
   test('manual location overrides distance reference', () {
     final svc = LocationService();
     expect(svc.hasFix, isFalse);
