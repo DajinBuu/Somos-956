@@ -82,13 +82,22 @@ class BorderService {
           ? 'commercial_vehicle_lanes'
           : 'passenger_vehicle_lanes';
 
-      // Prefer the fastest open lane group (Ready / NEXUS / FAST) since that is
-      // the wait a traveler can actually opt into; fall back to standard.
-      final pax = _bestLaneDelay(row, 'passenger_vehicle_lanes');
-      final veh = _bestLaneDelay(row, 'commercial_vehicle_lanes');
-      final ped = _bestLaneDelay(row, 'pedestrian_lanes');
+      // Headline wait = the standard (general) lane most travelers queue in, so
+      // bridges reflect their real differences. The fastest opt-in lane
+      // (Ready / NEXUS / FAST) is surfaced separately as a quick alternative.
+      final pax = _standardDelay(row, 'passenger_vehicle_lanes') ??
+          _bestLaneDelay(row, 'passenger_vehicle_lanes');
+      final veh = _standardDelay(row, 'commercial_vehicle_lanes') ??
+          _bestLaneDelay(row, 'commercial_vehicle_lanes');
+      final ped = _standardDelay(row, 'pedestrian_lanes') ??
+          _bestLaneDelay(row, 'pedestrian_lanes');
       final chosen = commercial ? (veh ?? pax) : (pax ?? veh);
       final closed = _isClosed(row, laneKey);
+      // The fastest lane a traveler can opt into (Ready / NEXUS / SENTRI).
+      final fastKey = commercial
+          ? 'commercial_vehicle_lanes'
+          : 'passenger_vehicle_lanes';
+      final fastest = _fastLaneDelay(row, fastKey);
 
       final wait = chosen ?? predictWait(b, now);
       return BridgeReading(
@@ -102,8 +111,42 @@ class BorderService {
         pedestrianWait: ped,
         laneStatus: _laneStatus(row, laneKey),
         lanesClosed: closed && chosen == null,
+        fastestLaneWait: fastest,
       );
     }).toList();
+  }
+
+  /// The standard (general purpose) lane delay for a category, or null.
+  int? _standardDelay(Map<String, dynamic> row, String laneKey) {
+    final lanes = row[laneKey];
+    if (lanes is! Map) return null;
+    final standard = lanes['standard_lanes'];
+    if (standard is! Map) return null;
+    final v = _parseInt(standard['delay_minutes']);
+    return v?.clamp(0, 300);
+  }
+
+  /// The minimum delay across the opt-in fast lane groups (Ready / NEXUS /
+  /// SENTRI / FAST), or null when none report a number.
+  int? _fastLaneDelay(Map<String, dynamic> row, String laneKey) {
+    final lanes = row[laneKey];
+    if (lanes is! Map) return null;
+    int? best;
+    for (final entry in lanes.entries) {
+      final key = '${entry.key}'.toLowerCase();
+      if (!(key.contains('nexus') ||
+          key.contains('sentri') ||
+          key.contains('ready') ||
+          key.contains('fast'))) {
+        continue;
+      }
+      final group = entry.value;
+      if (group is! Map) continue;
+      final v = _parseInt(group['delay_minutes']);
+      if (v == null) continue;
+      if (best == null || v < best) best = v;
+    }
+    return best?.clamp(0, 300);
   }
 
   Map<String, dynamic>? _matchPort(
@@ -208,7 +251,7 @@ class BorderService {
     final factor = factorForDay(weekday, hour);
     // Deterministic per-(day,hour) variation keeps the table from looking flat.
     final wobble = ((weekday * 5 + hour * 3) % 7) - 3;
-    return ((base * factor) + wobble).round().clamp(2, 120);
+    return ((base * factor * b.peakScale) + wobble).round().clamp(2, 120);
   }
 
   static int predictWait(Bridge b, DateTime t) {
@@ -216,7 +259,7 @@ class BorderService {
     final factor = factorForDay(t.weekday, t.hour);
     // Small deterministic variation by day so consecutive days aren't identical.
     final wobble = ((t.day * 7 + t.hour * 3) % 7) - 3;
-    return ((base * factor) + wobble).round().clamp(2, 120);
+    return ((base * factor * b.peakScale) + wobble).round().clamp(2, 120);
   }
 
   /// The hardest (highest-wait) hour of a given weekday, plus its wait.

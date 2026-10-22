@@ -129,6 +129,42 @@ void main() {
     expect(con.severity, RoadSeverity.major);
   });
 
+  test('bridge predictions differ across crossings', () {
+    final now = DateTime(2026, 5, 1, 8);
+    final waits = {for (final b in kBridges) b.id: BorderService.predictWait(b, now)};
+    // Hidalgo (busiest, pm-major shape) should not equal a light crossing.
+    expect(waits['hidalgo'], isNot(waits['los-ebanos']));
+    // At least four distinct values at the same hour — not all identical.
+    expect(waits.values.toSet().length, greaterThanOrEqualTo(4));
+    // Hidalgo runs heavier than the smallest crossings.
+    expect(waits['hidalgo']!, greaterThan(waits['falcon']!));
+  });
+
+  test('live readings use the standard lane, not the fastest', () async {
+    final client = MockClient((req) async {
+      return http.Response(
+        '[{"date":"05/01/2026","time":"10:00:00","port_number":"230501",'
+        '"port_name":"Hidalgo","port_status":"Open",'
+        '"passenger_vehicle_lanes":{"standard_lanes":{"delay_minutes":"40",'
+        '"operational_status":"delay"},'
+        '"NEXUS_SENTRI_lanes":{"delay_minutes":"2","operational_status":"no delay"}}}]',
+        200,
+      );
+    });
+    final svc = BorderService(client: client);
+    final readings = await svc.currentReadings();
+    final hidalgo = readings.firstWhere((r) => r.bridge.portNumber == '230501');
+    // Headline waits on the standard lane (40), not the NEXUS 2-minute lane.
+    expect(hidalgo.waitMinutes, 40);
+    expect(hidalgo.passengerWait, 40);
+    // The opt-in express lane is still surfaced separately.
+    expect(hidalgo.fastestLaneWait, 2);
+    expect(hidalgo.live, isTrue);
+    // Bridges with no feed row stay clearly marked as estimates.
+    final roma = readings.firstWhere((r) => r.bridge.portNumber == '231001');
+    expect(roma.live, isFalse);
+  });
+
   test('manual location overrides distance reference', () {
     final svc = LocationService();
     expect(svc.hasFix, isFalse);

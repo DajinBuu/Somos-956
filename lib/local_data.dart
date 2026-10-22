@@ -441,6 +441,12 @@ const _pmModerate = <int>[
   3, 3, 2, 2, 4, 9, 16, 24, 22, 14, 10, 9, 11, 13, 16, 24, 34, 38, 30, 18, 11, 7, 5, 4];
 const _amLight = <int>[
   2, 2, 2, 2, 3, 7, 13, 20, 17, 11, 8, 7, 8, 9, 10, 13, 17, 20, 15, 9, 6, 4, 3, 2];
+// Evening-weighted light crossing (small-town return traffic, e.g. Roma/Falcon).
+const _pmLight = <int>[
+  2, 2, 2, 2, 3, 5, 9, 14, 13, 9, 7, 7, 8, 10, 12, 15, 19, 21, 16, 10, 6, 4, 3, 2];
+// Pedestrian/general-heavy mid-morning pattern (e.g. downtown Brownsville).
+const _amPeak = <int>[
+  4, 4, 3, 3, 6, 14, 26, 38, 34, 22, 15, 13, 15, 17, 19, 24, 30, 34, 27, 17, 10, 7, 5, 4];
 
 const List<Bridge> kBridges = [
   Bridge(
@@ -452,6 +458,7 @@ const List<Bridge> kBridges = [
     crossing: 'To Reynosa',
     portNumber: '230501',
     hourlyPattern: _pmMajor,
+    peakScale: 1.25,
     lat: 26.0982,
     lon: -98.2602,
   ),
@@ -464,6 +471,7 @@ const List<Bridge> kBridges = [
     crossing: 'To Reynosa',
     portNumber: '230502',
     hourlyPattern: _amMajor,
+    peakScale: 1.15,
     lat: 26.1972,
     lon: -98.2202,
   ),
@@ -476,6 +484,7 @@ const List<Bridge> kBridges = [
     crossing: 'To Reynosa',
     portNumber: '230503',
     hourlyPattern: _pmModerate,
+    peakScale: 0.95,
     lat: 26.1402,
     lon: -98.3312,
   ),
@@ -487,7 +496,8 @@ const List<Bridge> kBridges = [
     cityEs: 'Progreso',
     crossing: 'To Nuevo Progreso',
     portNumber: '230901',
-    hourlyPattern: _pmModerate,
+    hourlyPattern: _amModerate,
+    peakScale: 1.05,
     lat: 26.0922,
     lon: -97.9572,
   ),
@@ -499,7 +509,8 @@ const List<Bridge> kBridges = [
     cityEs: 'Donna',
     crossing: 'To Río Bravo',
     portNumber: '230902',
-    hourlyPattern: _amLight,
+    hourlyPattern: _pmLight,
+    peakScale: 0.55,
     lat: 26.1522,
     lon: -98.0522,
   ),
@@ -512,6 +523,7 @@ const List<Bridge> kBridges = [
     crossing: 'To Ciudad Camargo',
     portNumber: '230701',
     hourlyPattern: _amModerate,
+    peakScale: 0.6,
     lat: 26.3702,
     lon: -98.8152,
   ),
@@ -524,6 +536,7 @@ const List<Bridge> kBridges = [
     crossing: 'To Matamoros',
     portNumber: '535502',
     hourlyPattern: _pmModerate,
+    peakScale: 0.85,
     lat: 25.8842,
     lon: -97.4472,
   ),
@@ -535,7 +548,8 @@ const List<Bridge> kBridges = [
     cityEs: 'Brownsville',
     crossing: 'To Matamoros',
     portNumber: '535504',
-    hourlyPattern: _amModerate,
+    hourlyPattern: _amPeak,
+    peakScale: 0.8,
     lat: 25.9002,
     lon: -97.4962,
   ),
@@ -548,6 +562,7 @@ const List<Bridge> kBridges = [
     crossing: 'To Matamoros',
     portNumber: '535501',
     hourlyPattern: _amLight,
+    peakScale: 0.7,
     lat: 25.8982,
     lon: -97.5122,
   ),
@@ -559,7 +574,8 @@ const List<Bridge> kBridges = [
     cityEs: 'Los Indios',
     crossing: 'To Matamoros',
     portNumber: '535503',
-    hourlyPattern: _amLight,
+    hourlyPattern: _pmLight,
+    peakScale: 0.45,
     lat: 26.0422,
     lon: -97.7402,
   ),
@@ -572,6 +588,7 @@ const List<Bridge> kBridges = [
     crossing: 'To Ciudad Miguel Alemán',
     portNumber: '231001',
     hourlyPattern: _amLight,
+    peakScale: 0.5,
     lat: 26.4042,
     lon: -99.0172,
   ),
@@ -583,7 +600,8 @@ const List<Bridge> kBridges = [
     cityEs: 'Falcon Heights',
     crossing: 'To Nueva Ciudad Guerrero',
     portNumber: '230610',
-    hourlyPattern: _amLight,
+    hourlyPattern: _pmLight,
+    peakScale: 0.35,
     lat: 26.5582,
     lon: -99.1642,
   ),
@@ -596,6 +614,7 @@ const List<Bridge> kBridges = [
     crossing: 'To Díaz Ordaz (ferry)',
     portNumber: '230620',
     hourlyPattern: _amLight,
+    peakScale: 0.3,
     lat: 26.2962,
     lon: -98.6402,
   ),

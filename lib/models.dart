@@ -78,6 +78,7 @@ class Bridge {
   final String crossing;
   final String portNumber; // CBP port_number used by the live BWT feed
   final List<int> hourlyPattern; // 24 values, typical wait minutes by hour
+  final double peakScale; // per-crossing magnitude vs. the shared shape
   final double lat;
   final double lon;
   const Bridge({
@@ -89,6 +90,7 @@ class Bridge {
     required this.crossing,
     required this.portNumber,
     required this.hourlyPattern,
+    this.peakScale = 1.0,
     required this.lat,
     required this.lon,
   });
@@ -105,6 +107,7 @@ class BridgeReading {
   final int? pedestrianWait;
   final String laneStatus;
   final bool lanesClosed;
+  final int? fastestLaneWait;
   const BridgeReading({
     required this.bridge,
     required this.waitMinutes,
@@ -116,6 +119,7 @@ class BridgeReading {
     this.pedestrianWait,
     this.laneStatus = '',
     this.lanesClosed = false,
+    this.fastestLaneWait,
   });
 }
 

@@ -535,6 +535,10 @@ class _TransportTabState extends State<TransportTab> {
                   if (r.pedestrianWait != null)
                     _laneChip(context, Icons.directions_walk,
                         s.t('pedestrian'), r.pedestrianWait!),
+                  if (r.fastestLaneWait != null &&
+                      r.fastestLaneWait! + 3 < r.waitMinutes)
+                    _laneChip(context, Icons.bolt, s.t('express_lane'),
+                        r.fastestLaneWait!),
                 ],
               ),
               const SizedBox(height: 6),

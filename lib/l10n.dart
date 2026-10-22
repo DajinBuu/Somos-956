@@ -519,6 +519,7 @@ class S {
     'no_closures': {'en': 'No reported closures right now', 'es': 'Sin cierres reportados ahora'},
     'loading': {'en': 'Loading…', 'es': 'Cargando…'},
     'none_active': {'en': 'None active', 'es': 'Ninguno activo'},
+    'express_lane': {'en': 'Express lane', 'es': 'Carril exprés'},
     'live_now': {'en': 'Live now', 'es': 'En vivo ahora'},
     'refreshing': {'en': 'Refreshing…', 'es': 'Actualizando…'},
     'try_again': {'en': 'Try again', 'es': 'Reintentar'},
