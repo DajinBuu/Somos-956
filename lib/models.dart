@@ -320,3 +320,97 @@ class EduResource {
     this.lon = 0,
   });
 }
+
+// ---------------------------------------------------------------------------
+// Mosquito activity
+// ---------------------------------------------------------------------------
+
+/// Overall mosquito pressure for an area, derived from weather that drives
+/// breeding and biting: recent rainfall, warmth, and humidity.
+enum MosquitoLevel { low, moderate, high, severe }
+
+/// A geographic sector of the Rio Grande Valley used to sample live weather and
+/// estimate mosquito activity. Coordinates are a representative center point.
+class MosquitoZone {
+  final String id;
+  final String name;
+  final String nameEs;
+  final String county;
+  final double lat;
+  final double lon;
+  const MosquitoZone({
+    required this.id,
+    required this.name,
+    required this.nameEs,
+    required this.county,
+    required this.lat,
+    required this.lon,
+  });
+}
+
+/// A live, weather-derived mosquito risk estimate for a [MosquitoZone].
+class MosquitoRisk {
+  final MosquitoZone zone;
+  final MosquitoLevel level;
+  final int score; // 0-100
+  final double tempF;
+  final int humidity;
+  final double rain7dIn; // rainfall over the past 7 days, inches
+  final bool live;
+  final DateTime updated;
+  const MosquitoRisk({
+    required this.zone,
+    required this.level,
+    required this.score,
+    required this.tempF,
+    required this.humidity,
+    required this.rain7dIn,
+    this.live = true,
+    required this.updated,
+  });
+}
+
+/// A user-submitted mosquito hot spot. Persisted locally on the device.
+class MosquitoReport {
+  final String id;
+  final String note;
+  final MosquitoLevel severity;
+  final double lat;
+  final double lon;
+  final DateTime when;
+  const MosquitoReport({
+    required this.id,
+    required this.note,
+    required this.severity,
+    required this.lat,
+    required this.lon,
+    required this.when,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'note': note,
+        'severity': severity.name,
+        'lat': lat,
+        'lon': lon,
+        'when': when.toIso8601String(),
+      };
+
+  static MosquitoReport? fromJson(Map<String, dynamic> m) {
+    try {
+      return MosquitoReport(
+        id: '${m['id']}',
+        note: '${m['note'] ?? ''}',
+        severity: MosquitoLevel.values.firstWhere(
+          (e) => e.name == '${m['severity']}',
+          orElse: () => MosquitoLevel.moderate,
+        ),
+        lat: (m['lat'] as num).toDouble(),
+        lon: (m['lon'] as num).toDouble(),
+        when: DateTime.tryParse('${m['when']}') ?? DateTime.now(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+}

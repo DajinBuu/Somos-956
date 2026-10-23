@@ -1352,3 +1352,161 @@ const List<EduResource> kEduResources = [
     lon: -97.6322,
   ),
 ];
+
+// ---------------------------------------------------------------------------
+// MOSQUITO ACTIVITY
+//
+// Rio Grande Valley sectors used to sample live weather and estimate mosquito
+// pressure. Coordinates are representative centers, spanning all four Valley
+// counties (Hidalgo, Cameron, Willacy, Starr). Aedes aegypti — the dengue and
+// Zika vector — is established in this region, so year-round risk matters.
+// ---------------------------------------------------------------------------
+
+const List<MosquitoZone> kMosquitoZones = [
+  MosquitoZone(
+    id: 'mcallen',
+    name: 'McAllen',
+    nameEs: 'McAllen',
+    county: 'Hidalgo',
+    lat: 26.2034,
+    lon: -98.2300,
+  ),
+  MosquitoZone(
+    id: 'edinburg',
+    name: 'Edinburg',
+    nameEs: 'Edinburg',
+    county: 'Hidalgo',
+    lat: 26.3017,
+    lon: -98.1633,
+  ),
+  MosquitoZone(
+    id: 'mission',
+    name: 'Mission',
+    nameEs: 'Mission',
+    county: 'Hidalgo',
+    lat: 26.2159,
+    lon: -98.3253,
+  ),
+  MosquitoZone(
+    id: 'pharr-san-juan',
+    name: 'Pharr / San Juan',
+    nameEs: 'Pharr / San Juan',
+    county: 'Hidalgo',
+    lat: 26.1948,
+    lon: -98.1836,
+  ),
+  MosquitoZone(
+    id: 'weslaco',
+    name: 'Weslaco',
+    nameEs: 'Weslaco',
+    county: 'Hidalgo',
+    lat: 26.1595,
+    lon: -97.9908,
+  ),
+  MosquitoZone(
+    id: 'mercedes',
+    name: 'Mercedes',
+    nameEs: 'Mercedes',
+    county: 'Hidalgo',
+    lat: 26.1498,
+    lon: -97.9136,
+  ),
+  MosquitoZone(
+    id: 'harlingen',
+    name: 'Harlingen',
+    nameEs: 'Harlingen',
+    county: 'Cameron',
+    lat: 26.1906,
+    lon: -97.6961,
+  ),
+  MosquitoZone(
+    id: 'san-benito',
+    name: 'San Benito',
+    nameEs: 'San Benito',
+    county: 'Cameron',
+    lat: 26.1326,
+    lon: -97.6311,
+  ),
+  MosquitoZone(
+    id: 'brownsville',
+    name: 'Brownsville',
+    nameEs: 'Brownsville',
+    county: 'Cameron',
+    lat: 25.9018,
+    lon: -97.4975,
+  ),
+  MosquitoZone(
+    id: 'los-fresnos',
+    name: 'Los Fresnos',
+    nameEs: 'Los Fresnos',
+    county: 'Cameron',
+    lat: 26.0717,
+    lon: -97.4764,
+  ),
+  MosquitoZone(
+    id: 'la-feria',
+    name: 'La Feria',
+    nameEs: 'La Feria',
+    county: 'Cameron',
+    lat: 26.1587,
+    lon: -97.8236,
+  ),
+  MosquitoZone(
+    id: 'raymondville',
+    name: 'Raymondville',
+    nameEs: 'Raymondville',
+    county: 'Willacy',
+    lat: 26.4815,
+    lon: -97.7831,
+  ),
+  MosquitoZone(
+    id: 'rio-grande-city',
+    name: 'Rio Grande City',
+    nameEs: 'Río Grande City',
+    county: 'Starr',
+    lat: 26.3798,
+    lon: -98.8203,
+  ),
+  MosquitoZone(
+    id: 'roma',
+    name: 'Roma',
+    nameEs: 'Roma',
+    county: 'Starr',
+    lat: 26.4053,
+    lon: -99.0153,
+  ),
+];
+
+/// Bilingual "fight the bite" prevention tips (title, titleEs, body, bodyEs).
+const List<CulturalTip> kMosquitoTips = [
+  CulturalTip(
+    'Dump standing water',
+    'Elimine el agua estancada',
+    'Empty buckets, tires, flowerpots and pet bowls weekly. Aedes aegypti breed in the smallest containers — even a bottle cap of water.',
+    'Vacíe cubetas, llantas, macetas y platos de mascotas cada semana. El Aedes aegypti se cría en recipientes pequeños — hasta en una tapa de botella con agua.',
+  ),
+  CulturalTip(
+    'Cover and treat',
+    'Cubra y trate',
+    'Screen windows, cover water tanks, and change pet water daily. Use larvicide in bird baths and rain barrels you can’t drain.',
+    'Ponga mosquiteros, cubra tanques de agua y cambie el agua de mascotas a diario. Use larvicida en bebederos y barriles que no pueda vaciar.',
+  ),
+  CulturalTip(
+    'Repel at dawn & dusk',
+    'Repelente al amanecer y anochecer',
+    'Wear repellent (DEET, picaridin or oil of lemon eucalyptus) when outdoors. Peak biting is early morning and evening.',
+    'Use repelente (DEET, picaridina o aceite de eucalipto limón) al aire libre. La mayor actividad es al amanecer y al atardecer.',
+  ),
+  CulturalTip(
+    'Dress for protection',
+    'Vístase para protegerse',
+    'Long sleeves and light-colored pants reduce bites, especially for kids and seniors who are most at risk.',
+    'Mangas largas y pantalón claro reducen las picaduras, sobre todo en niños y adultos mayores, que son los más vulnerables.',
+  ),
+  CulturalTip(
+    'Know the symptoms',
+    'Conozca los síntomas',
+    'Fever, headache, muscle aches or rash after mosquito bites can signal dengue. See a doctor — do not take aspirin or ibuprofen without advice.',
+    'Fiebre, dolor de cabeza, dolores musculares o sarpullido tras picaduras pueden indicar dengue. Consulte a un médico — no tome aspirina ni ibuprofeno sin indicación.',
+  ),
+];

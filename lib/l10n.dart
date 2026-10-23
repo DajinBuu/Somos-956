@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'models.dart';
 
 /// Language display modes selected on first launch.
 enum LangMode {
@@ -21,6 +25,7 @@ class AppSettings extends ChangeNotifier {
   bool reminderOn = true;
   final Set<String> savedResources = {};
   final List<Map<String, String>> reports = [];
+  final List<MosquitoReport> mosquitoReports = [];
 
   static const _kLang = 'lang';
   static const _kBilingual = 'bilingual';
@@ -28,6 +33,7 @@ class AppSettings extends ChangeNotifier {
   static const _kReminder = 'reminder_on';
   static const _kSaved = 'saved_resources';
   static const _kReports = 'reports';
+  static const _kMosquitoReports = 'mosquito_reports';
 
   LangMode get mode => bilingual
       ? LangMode.bilingual
@@ -53,6 +59,17 @@ class AppSettings extends ChangeNotifier {
           'time': parts.length > 2 ? parts[2] : '',
         };
       }));
+    final rawMosquito = p.getStringList(_kMosquitoReports) ?? const [];
+    mosquitoReports
+      ..clear()
+      ..addAll(rawMosquito.map((s) {
+        try {
+          return MosquitoReport.fromJson(
+              jsonDecode(s) as Map<String, dynamic>);
+        } catch (_) {
+          return null;
+        }
+      }).whereType<MosquitoReport>());
     notifyListeners();
   }
 
@@ -111,6 +128,18 @@ class AppSettings extends ChangeNotifier {
     _save();
   }
 
+  void addMosquitoReport(MosquitoReport r) {
+    mosquitoReports.insert(0, r);
+    notifyListeners();
+    _save();
+  }
+
+  void removeMosquitoReport(String id) {
+    mosquitoReports.removeWhere((r) => r.id == id);
+    notifyListeners();
+    _save();
+  }
+
   Future<void> _save() async {
     final p = await SharedPreferences.getInstance();
     await p.setString(_kLang, lang);
@@ -121,6 +150,10 @@ class AppSettings extends ChangeNotifier {
     await p.setStringList(
       _kReports,
       reports.map((r) => '${r['type']}|${r['text']}|${r['time']}').toList(),
+    );
+    await p.setStringList(
+      _kMosquitoReports,
+      mosquitoReports.map((r) => jsonEncode(r.toJson())).toList(),
     );
   }
 }
@@ -214,6 +247,7 @@ class S {
     'nav_move': {'en': 'Transport', 'es': 'Transporte'},
     'nav_community': {'en': 'Community', 'es': 'Comunidad'},
     'nav_education': {'en': 'Education', 'es': 'Educación'},
+    'nav_mosquito': {'en': 'Mosquitoes', 'es': 'Mosquitos'},
     'nav_more': {'en': 'More', 'es': 'Más'},
 
     // Home / dashboard
@@ -252,6 +286,7 @@ class S {
     'directions': {'en': 'Directions', 'es': 'Cómo llegar'},
     'save': {'en': 'Save', 'es': 'Guardar'},
     'saved': {'en': 'Saved', 'es': 'Guardado'},
+    'delete': {'en': 'Delete', 'es': 'Eliminar'},
     'close': {'en': 'Close', 'es': 'Cerrar'},
     'min': {'en': 'min', 'es': 'min'},
     'hours': {'en': 'Hours', 'es': 'Horario'},
@@ -564,5 +599,70 @@ class S {
     'location_set': {'en': 'Location set', 'es': 'Ubicación establecida'},
     'manual_location': {'en': 'Pinned on map', 'es': 'Fijado en el mapa'},
     'cancel': {'en': 'Cancel', 'es': 'Cancelar'},
+
+    // Mosquito activity
+    'mosquito_title': {'en': 'Mosquito hot spots', 'es': 'Zonas de mosquitos'},
+    'mosquito_intro': {
+      'en': 'Track mosquito pressure across the Valley and report hot spots near you. Risk is computed live from recent rain, heat and humidity — the conditions that drive breeding and biting.',
+      'es': 'Siga la actividad de mosquitos en el Valle y reporte zonas cercanas. El riesgo se calcula en vivo con la lluvia, el calor y la humedad recientes — las condiciones que impulsan la cría y las picaduras.',
+    },
+    'mosquito_risk_map': {
+      'en': 'Valley risk map',
+      'es': 'Mapa de riesgo del Valle',
+    },
+    'mosquito_risk_map_hint': {
+      'en': 'Tap a sector to see what is driving its risk.',
+      'es': 'Toque un sector para ver qué impulsa su riesgo.',
+    },
+    'mosquito_zone': {'en': 'Sector', 'es': 'Sector'},
+    'mosquito_level_low': {'en': 'Low', 'es': 'Baja'},
+    'mosquito_level_moderate': {'en': 'Moderate', 'es': 'Moderada'},
+    'mosquito_level_high': {'en': 'High', 'es': 'Alta'},
+    'mosquito_level_severe': {'en': 'Severe', 'es': 'Severa'},
+    'mosquito_score': {'en': 'Risk', 'es': 'Riesgo'},
+    'mosquito_drivers': {'en': 'Drivers', 'es': 'Factores'},
+    'mosquito_temp': {'en': 'Temperature', 'es': 'Temperatura'},
+    'mosquito_humidity': {'en': 'Humidity', 'es': 'Humedad'},
+    'mosquito_rain': {'en': 'Rain (7 days)', 'es': 'Lluvia (7 días)'},
+    'mosquito_no_rain': {'en': 'No recent rain', 'es': 'Sin lluvia reciente'},
+    'mosquito_rain_note': {
+      'en': 'Rain in the past week leaves standing water that hatches new mosquitoes in 7–10 days.',
+      'es': 'La lluvia de la semana pasada deja agua estancada que cría nuevos mosquitos en 7–10 días.',
+    },
+    'mosquito_report_hotspot': {
+      'en': 'Report a hot spot',
+      'es': 'Reportar una zona',
+    },
+    'mosquito_report_hint': {
+      'en': 'Seeing a swarm or lots of bites? Drop a pin and tell neighbors.',
+      'es': '¿Ve una nube de mosquitos o muchas picaduras? Ponga un pin y avise a los vecinos.',
+    },
+    'mosquito_report_now': {'en': 'Report here', 'es': 'Reportar aquí'},
+    'mosquito_my_reports': {'en': 'Your reports', 'es': 'Sus reportes'},
+    'mosquito_no_reports': {
+      'en': 'No reports yet. Tap "Report a hot spot" to add one.',
+      'es': 'Aún no hay reportes. Toque "Reportar una zona" para agregar uno.',
+    },
+    'mosquito_report_note': {'en': 'What are you seeing?', 'es': '¿Qué está viendo?'},
+    'mosquito_report_severity': {'en': 'How bad?', 'es': '¿Qué tan grave?'},
+    'mosquito_sev_annoying': {'en': 'Annoying', 'es': 'Molestos'},
+    'mosquito_sev_swarm': {'en': 'Swarm', 'es': 'Nube'},
+    'mosquito_sev_severe': {'en': 'Severe', 'es': 'Severo'},
+    'mosquito_need_location': {
+      'en': 'Pick your location first to report a hot spot.',
+      'es': 'Elija su ubicación primero para reportar una zona.',
+    },
+    'mosquito_saved': {'en': 'Hot spot reported', 'es': 'Zona reportada'},
+    'mosquito_tips': {'en': 'Fight the bite', 'es': 'Combata la picadura'},
+    'mosquito_tips_hint': {
+      'en': 'Five habits that cut mosquito numbers fast.',
+      'es': 'Cinco hábitos que reducen los mosquitos rápido.',
+    },
+    'mosquito_disclaimer': {
+      'en': 'Risk is a model based on live weather, not a count of trapped mosquitoes. For spraying schedules, contact your city or county health department.',
+      'es': 'El riesgo es un modelo basado en el clima en vivo, no un conteo de mosquitos capturados. Para horarios de fumigación, contacte a su departamento de salud municipal o del condado.',
+    },
+    'mosquito_reported_ago': {'en': 'Reported', 'es': 'Reportado'},
+    'mosquito_you': {'en': 'You', 'es': 'Usted'},
   };
 }

@@ -193,6 +193,77 @@ void main() {
     expect(hit!.term.toLowerCase(), contains('hypertension'));
   });
 
+  test('mosquito seed data is populated and bilingual', () {
+    expect(kMosquitoZones, isNotEmpty);
+    expect(kMosquitoTips, isNotEmpty);
+    for (final z in kMosquitoZones) {
+      expect(z.lat, inInclusiveRange(25.5, 27.0));
+      expect(z.lon, inInclusiveRange(-99.5, -97.0));
+      expect(z.county, isNotEmpty);
+      expect(z.nameEs, isNotEmpty);
+    }
+  });
+
+  test('mosquito risk scores from live weather', () async {
+    final client = MockClient((req) async {
+      return http.Response(
+        '[{"current":{"temperature_2m":88,"relative_humidity_2m":75},'
+        '"daily":{"precipitation_sum":[25.4,0,0,0,0,0,0,0]}},'
+        '{"current":{"temperature_2m":45,"relative_humidity_2m":40},'
+        '"daily":{"precipitation_sum":[0,0,0,0,0,0,0,0]}}]',
+        200,
+      );
+    });
+    final svc = MosquitoService(client: client);
+    final risks = await svc.risks();
+    expect(risks.length, kMosquitoZones.length);
+    // Wet + hot + humid scores higher than cold + dry.
+    expect(risks[0].score, greaterThan(risks[1].score));
+    expect(risks[0].level.index, greaterThanOrEqualTo(MosquitoLevel.high.index));
+    expect(risks[0].live, isTrue);
+    expect(risks[0].rain7dIn, closeTo(1.0, 0.01));
+    expect(risks[1].level, MosquitoLevel.low);
+  });
+
+  test('mosquito service falls back when the feed fails', () async {
+    final client = MockClient((req) async => http.Response('oops', 500));
+    final svc = MosquitoService(client: client);
+    final risks = await svc.risks();
+    expect(risks.length, kMosquitoZones.length);
+    for (final r in risks) {
+      expect(r.live, isFalse);
+      expect(r.score, inInclusiveRange(0, 100));
+    }
+  });
+
+  test('mosquito report serialization round-trips', () {
+    final r = MosquitoReport(
+      id: 'mr-1',
+      note: 'swarm at the park',
+      severity: MosquitoLevel.high,
+      lat: 26.2,
+      lon: -98.23,
+      when: DateTime(2026, 10, 1, 18, 30),
+    );
+    final back = MosquitoReport.fromJson(r.toJson());
+    expect(back, isNotNull);
+    expect(back!.id, 'mr-1');
+    expect(back.note, 'swarm at the park');
+    expect(back.severity, MosquitoLevel.high);
+    expect(back.lat, 26.2);
+    expect(back.when, r.when);
+  });
+
+  testWidgets('mosquito tab is visible in navigation', (tester) async {
+    SharedPreferences.setMockInitialValues({'onboarded': true, 'lang': 'en'});
+    final settings = AppSettings();
+    await settings.load();
+    await tester.pumpWidget(Somos956App(settings: settings));
+    await tester.pump();
+
+    expect(find.text('Mosquitoes'), findsWidgets);
+  });
+
   testWidgets('first launch shows the language chooser', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final settings = AppSettings();

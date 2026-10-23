@@ -6,6 +6,7 @@ import 'tabs/community.dart';
 import 'tabs/education.dart';
 import 'tabs/health.dart';
 import 'tabs/home.dart';
+import 'tabs/mosquito.dart';
 import 'tabs/onboarding.dart';
 import 'tabs/settings.dart';
 import 'tabs/transport.dart';
@@ -119,6 +120,7 @@ class _HomeShellState extends State<HomeShell> {
   late final List<Widget> _tabs = [
     HomeTab(onNavigate: (i) => setState(() => _index = i)),
     const HealthTab(),
+    const MosquitoTab(),
     const TransportTab(),
     const CommunityTab(),
     const EducationTab(),
@@ -196,6 +198,10 @@ class _HomeShellState extends State<HomeShell> {
               icon: const Icon(Icons.local_hospital_outlined),
               selectedIcon: const Icon(Icons.local_hospital),
               label: s.t('nav_health')),
+          NavigationDestination(
+              icon: const Icon(Icons.pest_control_outlined),
+              selectedIcon: const Icon(Icons.pest_control),
+              label: s.t('nav_mosquito')),
           NavigationDestination(
               icon: const Icon(Icons.directions_car_outlined),
               selectedIcon: const Icon(Icons.directions_car),

@@ -624,3 +624,113 @@ class TermDecoder {
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Mosquito activity — Open-Meteo driven breeding/biting risk (live)
+// ---------------------------------------------------------------------------
+
+/// Estimates mosquito pressure for each Valley sector from live weather that
+/// drives breeding and biting: rainfall over the past week, warmth, and
+/// humidity. There is no public RGV mosquito-count API, so this is a clearly
+/// labeled model — but it uses real, current conditions rather than static
+/// numbers, and it refreshes with the weather.
+class MosquitoService {
+  final http.Client _client;
+  MosquitoService({http.Client? client}) : _client = client ?? http.Client();
+
+  /// Scores every zone in one batched Open-Meteo request (comma-separated
+  /// coordinates return an array). Falls back to a climate-normal estimate per
+  /// zone when the network or API is unavailable.
+  Future<List<MosquitoRisk>> risks() async {
+    final now = DateTime.now();
+    final lats = kMosquitoZones.map((z) => z.lat).join(',');
+    final lons = kMosquitoZones.map((z) => z.lon).join(',');
+    try {
+      final uri = Uri.parse(
+        'https://api.open-meteo.com/v1/forecast?latitude=$lats&longitude=$lons'
+        '&current=temperature_2m,relative_humidity_2m'
+        '&daily=precipitation_sum&past_days=7&forecast_days=1'
+        '&temperature_unit=fahrenheit&timezone=America%2FChicago',
+      );
+      final res = await _client
+          .get(uri, headers: _headers())
+          .timeout(const Duration(seconds: 12));
+      if (res.statusCode != 200) return _fallback(now);
+      final body = jsonDecode(res.body);
+      final list = body is List ? body : [body];
+      final out = <MosquitoRisk>[];
+      for (var i = 0; i < kMosquitoZones.length; i++) {
+        final zone = kMosquitoZones[i];
+        final row = i < list.length ? list[i] as Map<String, dynamic> : null;
+        final cur = row?['current'] as Map<String, dynamic>?;
+        final temp = _parseDouble(cur?['temperature_2m']) ?? 82;
+        final humidity = _parseDouble(cur?['relative_humidity_2m']) ?? 65;
+        final rain = _recentRain(row?['daily'] as Map<String, dynamic>?);
+        out.add(_score(zone, temp, humidity, rain, now, live: row != null));
+      }
+      return out;
+    } catch (_) {
+      return _fallback(now);
+    }
+  }
+
+  /// Sums daily precipitation (inches) across the past days returned.
+  static double _recentRain(Map<String, dynamic>? daily) {
+    final sums = daily?['precipitation_sum'];
+    if (sums is! List) return 0;
+    var total = 0.0;
+    for (final v in sums) {
+      total += (_parseDouble(v) ?? 0) / 25.4; // mm -> inches
+    }
+    return double.parse(total.toStringAsFixed(2));
+  }
+
+  /// Combines the three drivers into a 0-100 pressure score and a level.
+  static MosquitoRisk _score(MosquitoZone zone, double tempF, double humidity,
+      double rain7dIn, DateTime now,
+      {required bool live}) {
+    // Warmth: Aedes are most active ~70-90°F; freeze/heat both suppress.
+    double tempScore;
+    if (tempF < 50) {
+      tempScore = 0;
+    } else if (tempF < 65) {
+      tempScore = (tempF - 50) / 15 * 25;
+    } else if (tempF <= 92) {
+      tempScore = 30;
+    } else {
+      tempScore = (30 - (tempF - 92) * 1.5).clamp(0, 30).toDouble();
+    }
+    // Rain: standing water drives breeding; the first inch matters most.
+    final rainScore = (rain7dIn.clamp(0, 3) / 3 * 40).toDouble();
+    // Humidity: higher humidity extends mosquito survival and biting.
+    final humidityScore = ((humidity.clamp(30, 90) - 30) / 60 * 30).toDouble();
+
+    final score = (tempScore + rainScore + humidityScore)
+        .clamp(0, 100)
+        .round();
+    final level = score >= 75
+        ? MosquitoLevel.severe
+        : score >= 55
+            ? MosquitoLevel.high
+            : score >= 35
+                ? MosquitoLevel.moderate
+                : MosquitoLevel.low;
+    return MosquitoRisk(
+      zone: zone,
+      level: level,
+      score: score,
+      tempF: tempF,
+      humidity: humidity.round(),
+      rain7dIn: rain7dIn,
+      live: live,
+      updated: now,
+    );
+  }
+
+  /// Warm-season climate-normal estimate used when the live feed is unreachable.
+  /// The Valley's typical late-summer conditions give a moderate-to-high score.
+  static List<MosquitoRisk> _fallback(DateTime now) => kMosquitoZones
+      .map((z) => _score(z, 88, 70, 0.6, now, live: false))
+      .toList();
+}
+
